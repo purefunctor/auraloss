@@ -63,11 +63,13 @@ class RecordingDataset(Dataset):
         *,
         near_is_input: bool,
         chunk_length: int = 2048,
+        prefix: str = "",
     ):
         self.data_path = data_path
         self.mic_pairs = mic_pairs
         self.near_is_input = near_is_input
         self.chunk_length = chunk_length
+        self.prefix = prefix
 
         self.input_files = []
         self.target_files = []
@@ -137,11 +139,16 @@ class RecordingDataset(Dataset):
             target_audio = f.read(self.chunk_length)
 
         if self.near_is_input:
-            near_is_input = torch.Tensor([0.0]).unsqueeze(0)
-        else:
             near_is_input = torch.Tensor([1.0]).unsqueeze(0)
+        else:
+            near_is_input = torch.Tensor([0.0]).unsqueeze(0)
+
+        match = FILE_PATTERN.match(input_file.name)
+        (name, _, offset) = match.groups()
+        tag = "near_to_far" if self.near_is_input else "far_to_near"
 
         return (
+            f"{self.prefix}_{name}_{tag}_{offset}.wav",
             torch.Tensor(input_audio).unsqueeze(0),
             torch.Tensor(target_audio).unsqueeze(0),
             near_is_input,
@@ -182,12 +189,14 @@ class DistanceDataModule(pl.LightningDataModule):
             {"67": "269", "87": "87", "103": "103"},
             near_is_input=self.near_is_input,
             chunk_length=self.chunk_length,
+            prefix="day_1",
         )
         train_day_2 = RecordingDataset(
             self.day_2_path,
             {"67": "269", "87": "87", "103": "103"},
             near_is_input=self.near_is_input,
             chunk_length=self.chunk_length,
+            prefix="day_2",
         )
         self.training_dataset = ConcatDataset([train_day_1, train_day_2])
 
@@ -196,12 +205,14 @@ class DistanceDataModule(pl.LightningDataModule):
             {"414": "414"},
             near_is_input=self.near_is_input,
             chunk_length=self.chunk_length,
+            prefix="day_1",
         )
         validate_day_2 = RecordingDataset(
             self.day_1_path,
             {"414": "414"},
             near_is_input=self.near_is_input,
             chunk_length=self.chunk_length,
+            prefix="day_2",
         )
         self.validation_dataset = ConcatDataset([validate_day_1, validate_day_2])
 
@@ -223,7 +234,11 @@ class DistanceDataModule(pl.LightningDataModule):
 
 if __name__ == "__main__":
     per_second = RecordingDataset(
-        DAY_1_FOLDER, {"67": "269"}, near_is_input=False, chunk_length=44100
+        DAY_1_FOLDER,
+        {"414": "414"},
+        near_is_input=True,
+        chunk_length=44100,
+        prefix="day_1",
     )
 
     input_frames = 0
@@ -238,8 +253,7 @@ if __name__ == "__main__":
 
     actual_frames = 0
     for i in range(len(per_second)):
-        input_audio, _, near_is_input = per_second[i]
-        print(input_audio.shape)
+        _, input_audio, _, near_is_input = per_second[i]
         actual_frames += len(input_audio)
     print("Actual length in seconds:", actual_frames / 44100)
     print("Actual length with loss:", actual_frames / 44100 + apparent_loss)

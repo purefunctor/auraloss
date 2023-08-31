@@ -1,5 +1,7 @@
 import auraloss
+from pathlib import Path
 import pytorch_lightning as pl
+import soundfile as sf
 import torch
 
 
@@ -132,6 +134,8 @@ class TCNModule(pl.LightningModule):
         self.reduce_output = torch.nn.Conv1d(out_ch, 1, kernel_size=1)
         self.final_activation = torch.nn.Tanh()
 
+        self.validation_epoch_outputs = []
+
     def forward(self, x, p):
         conditioning = self.expand_parameters(p)
         for index, tcn_block in enumerate(self.tcn_blocks):
@@ -145,20 +149,26 @@ class TCNModule(pl.LightningModule):
         return x
 
     def training_step(self, batch, *_):
-        input_signal, target_signal, parameters = batch
+        _, input_signal, target_signal, parameters = batch
 
         predicted_signal = self(input_signal, parameters)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
         loss = self.loss_function(predicted_signal, target_signal)
         self.log(
-            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+            "train_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
         )
 
         return loss
 
     def validation_step(self, batch, *_):
-        input_signal, target_signal, parameters = batch
+        file_name, input_signal, target_signal, parameters = batch
         predicted_signal = self(input_signal, parameters)
 
         input_signal = center_crop(input_signal, predicted_signal.shape)
@@ -166,16 +176,50 @@ class TCNModule(pl.LightningModule):
 
         loss = self.loss_function(predicted_signal, target_signal)
 
-        self.log("val_loss", loss)
+        self.log("val_loss", loss, sync_dist=True)
 
+        self.validation_epoch_outputs.append(
+            {
+                "name": file_name,
+                "input": input_signal.cpu().numpy(),
+                "target": target_signal.cpu().numpy(),
+                "prediction": predicted_signal.cpu().numpy(),
+                "parameters": parameters.cpu().numpy(),
+            }
+        )
+
+    def on_validation_epoch_end(self):
         outputs = {
-            "input": input_signal.cpu().numpy(),
-            "target": target_signal.cpu().numpy(),
-            "prediction": predicted_signal.cpu().numpy(),
-            "parameters": parameters.cpu().numpy(),
+            "name": [],
+            "input": [],
+            "target": [],
+            "prediction": [],
+            "parameters": [],
         }
-
-        return outputs
+        for validation_epoch_output in self.validation_epoch_outputs:
+            outputs["name"].append(validation_epoch_output["name"])
+            outputs["input"].append(validation_epoch_output["input"])
+            outputs["target"].append(validation_epoch_output["target"])
+            outputs["prediction"].append(
+                validation_epoch_output["prediction"]
+            )
+            outputs["parameters"].append(
+                validation_epoch_output["parameters"]
+            )
+        audio_output_folder = (
+            Path("lightning_logs") / f"version_{self.logger.version}" / "output"
+        )
+        if not audio_output_folder.exists():
+            audio_output_folder.mkdir()
+        for names, inputs in zip(outputs["name"], outputs["input"]):
+            for n, i in zip(names, inputs):
+                print(i.shape)
+                audio_file = audio_output_folder / n
+                if not audio_file.exists():
+                    sf.write(audio_file, [], samplerate=44100)
+                with sf.SoundFile(audio_file, "r+") as f:
+                    f.seek(0, sf.SEEK_END)
+                    f.write(i[0])
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr)
@@ -198,11 +242,8 @@ if __name__ == "__main__":
 
     model = TCNModule()
     datamodule = DistanceDataModule(
-        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768, num_workers=6
+        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=44100, num_workers=24
     )
 
-    torch.manual_seed(42)
-    torch.set_float32_matmul_precision("medium")
-
-    trainer = Trainer(max_epochs=10)
-    trainer.fit(model, datamodule=datamodule)
+    trainer = Trainer(max_epochs=10, devices=1, num_nodes=1)
+    trainer.validate(model, datamodule=datamodule)
