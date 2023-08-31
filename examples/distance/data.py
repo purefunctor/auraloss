@@ -32,11 +32,9 @@ from itertools import tee
 from pathlib import Path
 import pytorch_lightning as pl
 import re
-from pytorch_lightning.utilities.types import EVAL_DATALOADERS
 import soundfile as sf
 import torch
-from torch.utils.data import Dataset, DataLoader
-import typing as t
+from torch.utils.data import ConcatDataset, Dataset, DataLoader
 
 DAY_1_FOLDER = Path("./data/day1_unsilenced")
 DAY_2_FOLDER = Path("./data/day2_unsilenced")
@@ -159,41 +157,60 @@ class RecordingDataset(Dataset):
 class DistanceDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        data_path: Path,
+        day_1_path: Path,
+        day_2_path: Path,
         *,
         near_is_input: bool = True,
         chunk_length: int = 2048,
         shuffle: bool = True,
         batch_size: int = 64,
+        num_workers: int = 0,
     ):
         super().__init__()
-        self.data_path = data_path
+        self.day_1_path = day_1_path
+        self.day_2_path = day_2_path
         self.near_is_input = near_is_input
         self.chunk_length = chunk_length
 
         self.shuffle = shuffle
         self.batch_size = batch_size
+        self.num_workers = num_workers
 
     def setup(self, stage: str):
-        self.training_dataset = RecordingDataset(
-            self.data_path,
+        train_day_1 = RecordingDataset(
+            self.day_1_path,
             {"67": "269", "87": "87", "103": "103"},
             near_is_input=self.near_is_input,
             chunk_length=self.chunk_length,
         )
+        train_day_2 = RecordingDataset(
+            self.day_2_path,
+            {"67": "269", "87": "87", "103": "103"},
+            near_is_input=self.near_is_input,
+            chunk_length=self.chunk_length,
+        )
+        self.training_dataset = ConcatDataset([train_day_1, train_day_2])
 
-        self.validation_dataset = RecordingDataset(
-            self.data_path,
+        validate_day_1 = RecordingDataset(
+            self.day_1_path,
             {"414": "414"},
             near_is_input=self.near_is_input,
             chunk_length=self.chunk_length,
         )
+        validate_day_2 = RecordingDataset(
+            self.day_1_path,
+            {"414": "414"},
+            near_is_input=self.near_is_input,
+            chunk_length=self.chunk_length,
+        )
+        self.validation_dataset = ConcatDataset([validate_day_1, validate_day_2])
 
     def train_dataloader(self):
         return DataLoader(
             self.training_dataset,
             shuffle=self.shuffle,
             batch_size=self.batch_size,
+            num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
@@ -201,6 +218,7 @@ class DistanceDataModule(pl.LightningDataModule):
             self.validation_dataset,
             shuffle=self.shuffle,
             batch_size=self.batch_size,
+            num_workers=self.num_workers,
         )
 
 

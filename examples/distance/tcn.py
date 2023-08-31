@@ -1,8 +1,5 @@
 import pytorch_lightning as pl
-from pytorch_lightning.utilities.types import STEP_OUTPUT
 import torch
-
-import auraloss
 
 
 def center_crop(x, shape):
@@ -153,14 +150,16 @@ class TCNModule(pl.LightningModule):
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
         loss = self.loss_function(predicted_signal, target_signal)
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log(
+            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+        )
 
         return loss
-    
+
     def validation_step(self, batch, *_):
         input_signal, target_signal, parameters = batch
         predicted_signal = self(input_signal, parameters)
-        
+
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
@@ -192,11 +191,11 @@ class TCNModule(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    from data import DAY_1_FOLDER, DistanceDataModule
+    from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceDataModule
     from pytorch_lightning import Trainer
 
     model = TCNModule()
-    datamodule = DistanceDataModule(DAY_1_FOLDER)
+    datamodule = DistanceDataModule(DAY_1_FOLDER, DAY_2_FOLDER)
 
     trainer = Trainer()
     trainer.fit(model, datamodule=datamodule)
