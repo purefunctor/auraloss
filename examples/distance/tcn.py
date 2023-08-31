@@ -193,7 +193,6 @@ class TCNModule(pl.LightningModule):
 
 if __name__ == "__main__":
     from data import DAY_1_FOLDER, DistanceDataModule
-    from torch.utils.data import DataLoader
     from pytorch_lightning import Trainer
 
     model = TCNModule()
