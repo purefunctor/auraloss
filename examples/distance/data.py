@@ -216,7 +216,6 @@ class DistanceDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.validation_dataset,
-            shuffle=self.shuffle,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
         )

@@ -193,9 +193,12 @@ class TCNModule(pl.LightningModule):
 if __name__ == "__main__":
     from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceDataModule
     from pytorch_lightning import Trainer
+    import torch
 
     model = TCNModule()
-    datamodule = DistanceDataModule(DAY_1_FOLDER, DAY_2_FOLDER)
+    datamodule = DistanceDataModule(
+        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768, num_workers=6
+    )
 
-    trainer = Trainer()
+    trainer = Trainer(max_epochs=10)
     trainer.fit(model, datamodule=datamodule)
