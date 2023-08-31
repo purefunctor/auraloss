@@ -139,11 +139,15 @@ class RecordingDataset(Dataset):
             target_audio = f.read(self.chunk_length)
 
         if self.near_is_input:
-            near_is_input = torch.Tensor([0.0])
+            near_is_input = torch.Tensor([0.0]).unsqueeze(1)
         else:
-            near_is_input = torch.Tensor([1.0])
+            near_is_input = torch.Tensor([1.0]).unsqueeze(1)
 
-        return torch.Tensor(input_audio), torch.Tensor(target_audio), near_is_input
+        return (
+            torch.Tensor(input_audio).unsqueeze(1),
+            torch.Tensor(target_audio).unsqueeze(1),
+            near_is_input,
+        )
 
     def __len__(self) -> int:
         i = self._input_markers[-1]
