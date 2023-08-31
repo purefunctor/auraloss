@@ -32,9 +32,10 @@ from itertools import tee
 from pathlib import Path
 import pytorch_lightning as pl
 import re
+from pytorch_lightning.utilities.types import EVAL_DATALOADERS
 import soundfile as sf
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import typing as t
 
 DAY_1_FOLDER = Path("./data/day1_unsilenced")
@@ -138,9 +139,9 @@ class RecordingDataset(Dataset):
             target_audio = f.read(self.chunk_length)
 
         if self.near_is_input:
-            near_is_input = torch.Tensor([0.])
+            near_is_input = torch.Tensor([0.0])
         else:
-            near_is_input = torch.Tensor([1.])
+            near_is_input = torch.Tensor([1.0])
 
         return torch.Tensor(input_audio), torch.Tensor(target_audio), near_is_input
 
@@ -152,14 +153,50 @@ class RecordingDataset(Dataset):
 
 
 class DistanceDataModule(pl.LightningDataModule):
-    def __init__(self, data_path: Path, *, near_is_input: bool):
+    def __init__(
+        self,
+        data_path: Path,
+        *,
+        near_is_input: bool = True,
+        chunk_length: int = 2048,
+        shuffle: bool = True,
+        batch_size: int = 64,
+    ):
         super().__init__()
         self.data_path = data_path
         self.near_is_input = near_is_input
+        self.chunk_length = chunk_length
+
+        self.shuffle = shuffle
+        self.batch_size = batch_size
 
     def setup(self, _: str):
         self.training_dataset = RecordingDataset(
-            self.data_path, {"67": "269"}, self.near_is_input
+            self.data_path,
+            {"67": "269", "87": "87", "103": "103"},
+            near_is_input=self.near_is_input,
+            chunk_length=self.chunk_length,
+        )
+
+        self.validation_dataset = RecordingDataset(
+            self.data_path,
+            {"414": "414"},
+            near_is_input=self.near_is_input,
+            chunk_length=self.chunk_length,
+        )
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.training_dataset,
+            shuffle=self.shuffle,
+            batch_size=self.batch_size,
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.validation_dataset,
+            shuffle=self.shuffle,
+            batch_size=self.batch_size,
         )
 
 
