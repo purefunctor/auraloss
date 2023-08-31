@@ -1,3 +1,4 @@
+import auraloss
 import pytorch_lightning as pl
 import torch
 
@@ -102,7 +103,7 @@ class TCNModule(pl.LightningModule):
         if nparams == 0:
             raise ValueError("Must have at least one conditioning parameter.")
 
-        self.loss_function = torch.nn.L1Loss()
+        self.loss_function = auraloss.freq.MultiResolutionSTFTLoss()
 
         self.expand_parameters = torch.nn.Sequential(
             torch.nn.Linear(nparams, 32),
