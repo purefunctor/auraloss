@@ -139,13 +139,13 @@ class RecordingDataset(Dataset):
             target_audio = f.read(self.chunk_length)
 
         if self.near_is_input:
-            near_is_input = torch.Tensor([0.0]).unsqueeze(1)
+            near_is_input = torch.Tensor([0.0]).unsqueeze(0)
         else:
-            near_is_input = torch.Tensor([1.0]).unsqueeze(1)
+            near_is_input = torch.Tensor([1.0]).unsqueeze(0)
 
         return (
-            torch.Tensor(input_audio).unsqueeze(1),
-            torch.Tensor(target_audio).unsqueeze(1),
+            torch.Tensor(input_audio).unsqueeze(0),
+            torch.Tensor(target_audio).unsqueeze(0),
             near_is_input,
         )
 
@@ -174,7 +174,7 @@ class DistanceDataModule(pl.LightningDataModule):
         self.shuffle = shuffle
         self.batch_size = batch_size
 
-    def setup(self, _: str):
+    def setup(self, stage: str):
         self.training_dataset = RecordingDataset(
             self.data_path,
             {"67": "269", "87": "87", "103": "103"},
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     actual_frames = 0
     for i in range(len(per_second)):
         input_audio, _, near_is_input = per_second[i]
-        print(near_is_input)
+        print(input_audio.shape)
         actual_frames += len(input_audio)
     print("Actual length in seconds:", actual_frames / 44100)
     print("Actual length with loss:", actual_frames / 44100 + apparent_loss)
