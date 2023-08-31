@@ -200,5 +200,8 @@ if __name__ == "__main__":
         DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768, num_workers=6
     )
 
+    torch.manual_seed(42)
+    torch.set_float32_matmul_precision("medium")
+
     trainer = Trainer(max_epochs=10)
     trainer.fit(model, datamodule=datamodule)
