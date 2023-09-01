@@ -130,13 +130,13 @@ class RecordingDataset(Dataset):
         with sf.SoundFile(input_file, "r") as f:
             frame_index = chunk_relative * self.chunk_length
             f.seek(frame_index)
-            input_audio = f.read(self.chunk_length)
+            input_audio = f.read(self.chunk_length, dtype="float32")
 
         target_file = self.target_files[file_index]
         with sf.SoundFile(target_file, "r") as f:
             frame_index = chunk_relative * self.chunk_length
             f.seek(frame_index)
-            target_audio = f.read(self.chunk_length)
+            target_audio = f.read(self.chunk_length, dtype="float32")
 
         if self.near_is_input:
             near_is_input = torch.Tensor([1.0]).unsqueeze(0)
@@ -149,8 +149,8 @@ class RecordingDataset(Dataset):
 
         return (
             f"{self.prefix}_{name}_{tag}_{offset}.wav",
-            torch.Tensor(input_audio).unsqueeze(0),
-            torch.Tensor(target_audio).unsqueeze(0),
+            torch.tensor(input_audio).unsqueeze(0),
+            torch.tensor(target_audio).unsqueeze(0),
             near_is_input,
         )
 
@@ -184,37 +184,41 @@ class DistanceDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
 
     def setup(self, stage: str):
-        train_day_1 = RecordingDataset(
-            self.day_1_path,
-            {"67": "269", "87": "87", "103": "103"},
-            near_is_input=self.near_is_input,
-            chunk_length=self.chunk_length,
-            prefix="day_1",
-        )
-        train_day_2 = RecordingDataset(
-            self.day_2_path,
-            {"67": "269", "87": "87", "103": "103"},
-            near_is_input=self.near_is_input,
-            chunk_length=self.chunk_length,
-            prefix="day_2",
-        )
-        self.training_dataset = ConcatDataset([train_day_1, train_day_2])
+        training_dataset = []
+        for near_is_input in [True, False]:
+            training_dataset.append(RecordingDataset(
+                self.day_1_path,
+                {"67": "269", "87": "87", "103": "103"},
+                near_is_input=near_is_input,
+                chunk_length=self.chunk_length,
+                prefix="day_1",
+            ))
+            training_dataset.append(RecordingDataset(
+                self.day_2_path,
+                {"67": "269", "87": "87", "103": "103"},
+                near_is_input=near_is_input,
+                chunk_length=self.chunk_length,
+                prefix="day_2",
+            ))
+        self.training_dataset = ConcatDataset(training_dataset)
 
-        validate_day_1 = RecordingDataset(
-            self.day_1_path,
-            {"414": "414"},
-            near_is_input=self.near_is_input,
-            chunk_length=self.chunk_length,
-            prefix="day_1",
-        )
-        validate_day_2 = RecordingDataset(
-            self.day_1_path,
-            {"414": "414"},
-            near_is_input=self.near_is_input,
-            chunk_length=self.chunk_length,
-            prefix="day_2",
-        )
-        self.validation_dataset = ConcatDataset([validate_day_1, validate_day_2])
+        validation_dataset = []
+        for near_is_input in [True, False]:
+            validation_dataset.append(RecordingDataset(
+                self.day_1_path,
+                {"414": "414"},
+                near_is_input=near_is_input,
+                chunk_length=self.chunk_length,
+                prefix="day_1",
+            ))
+            validation_dataset.append(RecordingDataset(
+                self.day_2_path,
+                {"414": "414"},
+                near_is_input=near_is_input,
+                chunk_length=self.chunk_length,
+                prefix="day_2",
+            ))
+        self.validation_dataset = ConcatDataset(validation_dataset)
 
     def train_dataloader(self):
         return DataLoader(
@@ -255,5 +259,5 @@ if __name__ == "__main__":
     for i in range(len(per_second)):
         _, input_audio, _, near_is_input = per_second[i]
         actual_frames += len(input_audio)
-    print("Actual length in seconds:", actual_frames / 44100)
-    print("Actual length with loss:", actual_frames / 44100 + apparent_loss)
+    print("Actual length in seconds:", actual_frames)
+    print("Actual length with loss:", actual_frames + apparent_loss)
