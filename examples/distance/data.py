@@ -184,12 +184,12 @@ class DistanceDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         training_dataset = []
-        for is_identity in [True, False]:
+        for is_enabled in [True, False]:
             training_dataset.append(
                 RecordingDataset(
                     self.day_1_path,
                     {"67": "269", "87": "87", "103": "103"},
-                    is_identity=is_identity,
+                    is_enabled=is_enabled,
                     near_is_input=self.near_is_input,
                     chunk_length=self.chunk_length,
                     prefix="day_1",
@@ -198,12 +198,12 @@ class DistanceDataModule(pl.LightningDataModule):
         self.training_dataset = ConcatDataset(training_dataset)
 
         validation_dataset = []
-        for is_identity in [True, False]:
+        for is_enabled in [True, False]:
             validation_dataset.append(
                 RecordingDataset(
                     self.day_1_path,
                     {"414": "414"},
-                    is_identity=is_identity,
+                    is_enabled=is_enabled,
                     near_is_input=self.near_is_input,
                     chunk_length=self.chunk_length,
                     prefix="day_1",
