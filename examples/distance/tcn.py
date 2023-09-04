@@ -63,20 +63,20 @@ class TCNBlock(torch.nn.Module):
         if depthwise:
             self.conv1b = torch.nn.Conv1d(out_ch, out_ch, kernel_size=1)
 
-        self.film = FiLM(out_ch, 128)
+        self.bn = torch.nn.BatchNorm1d(out_ch)
 
         self.relu = torch.nn.PReLU(out_ch)
         self.res = torch.nn.Conv1d(
             in_ch, out_ch, kernel_size=1, groups=in_ch, bias=False
         )
 
-    def forward(self, x, p=None):
+    def forward(self, x):
         x_in = x
 
         x = self.conv1(x)
         if self.depthwise:
             x = self.conv1b(x)
-        x = self.film(x, p)
+        x = self.bn(x)
         x = self.relu(x)
 
         x_res = self.res(x_in)
@@ -149,9 +149,9 @@ class TCNModule(pl.LightningModule):
         return x
 
     def training_step(self, batch, *_):
-        _, input_signal, target_signal, parameters = batch
+        input_signal, target_signal, _ = batch
 
-        predicted_signal = self(input_signal, parameters)
+        predicted_signal = self(input_signal)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
         loss = self.loss_function(predicted_signal, target_signal)
@@ -168,8 +168,8 @@ class TCNModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, *_):
-        _, input_signal, target_signal, parameters = batch
-        predicted_signal = self(input_signal, parameters)
+        input_signal, target_signal, _ = batch
+        predicted_signal = self(input_signal)
 
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
@@ -177,49 +177,6 @@ class TCNModule(pl.LightningModule):
         loss = self.loss_function(predicted_signal, target_signal)
 
         self.log("val_loss", loss, sync_dist=True)
-
-        # self.validation_epoch_outputs.append(
-        #     {
-        #         "name": file_name,
-        #         "input": input_signal.cpu().numpy(),
-        #         "target": target_signal.cpu().numpy(),
-        #         "prediction": predicted_signal.cpu().numpy(),
-        #         "parameters": parameters.cpu().numpy(),
-        #     }
-        # )
-
-    # def on_validation_epoch_end(self):
-    #     outputs = {
-    #         "name": [],
-    #         "input": [],
-    #         "target": [],
-    #         "prediction": [],
-    #         "parameters": [],
-    #     }
-    #     for validation_epoch_output in self.validation_epoch_outputs:
-    #         outputs["name"].append(validation_epoch_output["name"])
-    #         outputs["input"].append(validation_epoch_output["input"])
-    #         outputs["target"].append(validation_epoch_output["target"])
-    #         outputs["prediction"].append(
-    #             validation_epoch_output["prediction"]
-    #         )
-    #         outputs["parameters"].append(
-    #             validation_epoch_output["parameters"]
-    #         )
-    #     audio_output_folder = (
-    #         Path("lightning_logs") / f"version_{self.logger.version}" / "output"
-    #     )
-    #     if not audio_output_folder.exists():
-    #         audio_output_folder.mkdir(parents=True)
-    #     for names, prediction in zip(outputs["name"], outputs["prediction"]):
-    #         for n, s in zip(names, prediction):
-    #             audio_file = audio_output_folder / n
-    #             if not audio_file.exists():
-    #                 sf.write(audio_file, [], samplerate=44100)
-    #             with sf.SoundFile(audio_file, "r+") as f:
-    #                 f.seek(0, sf.SEEK_END)
-    #                 f.write(s[0])
-    #     self.validation_epoch_outputs.clear()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr)
