@@ -149,7 +149,7 @@ class TCNModule(pl.LightningModule):
         return x
 
     def training_step(self, batch, *_):
-        input_signal, target_signal, _ = batch
+        input_signal, target_signal = batch
 
         predicted_signal = self(input_signal)
         target_signal = center_crop(target_signal, predicted_signal.shape)
@@ -168,7 +168,7 @@ class TCNModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, *_):
-        input_signal, target_signal, _ = batch
+        input_signal, target_signal = batch
         predicted_signal = self(input_signal)
 
         input_signal = center_crop(input_signal, predicted_signal.shape)
