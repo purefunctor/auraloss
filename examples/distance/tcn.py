@@ -107,15 +107,6 @@ class TCNModule(pl.LightningModule):
 
         self.loss_function = auraloss.freq.MultiResolutionSTFTLoss()
 
-        self.expand_parameters = torch.nn.Sequential(
-            torch.nn.Linear(nparams, 32),
-            torch.nn.PReLU(),
-            torch.nn.Linear(32, 64),
-            torch.nn.PReLU(),
-            torch.nn.Linear(64, 128),
-            torch.nn.PReLU(),
-        )
-
         self.tcn_blocks = torch.nn.ModuleList()
         for n in range(nblocks):
             in_ch = channel_width if n > 0 else 1
@@ -136,10 +127,9 @@ class TCNModule(pl.LightningModule):
 
         # self.validation_epoch_outputs = []
 
-    def forward(self, x, p):
-        conditioning = self.expand_parameters(p)
+    def forward(self, x):
         for index, tcn_block in enumerate(self.tcn_blocks):
-            x = tcn_block(x, conditioning)
+            x = tcn_block(x)
             if index == 0:
                 skips = x
             else:
