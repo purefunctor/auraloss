@@ -201,12 +201,12 @@ class DistanceDataModule(pl.LightningDataModule):
         for is_identity in [True, False]:
             validation_dataset.append(
                 RecordingDataset(
-                    self.day_2_path,
+                    self.day_1_path,
                     {"414": "414"},
                     is_identity=is_identity,
                     near_is_input=self.near_is_input,
                     chunk_length=self.chunk_length,
-                    prefix="day_2",
+                    prefix="day_1",
                 )
             )
         self.validation_dataset = ConcatDataset(validation_dataset)
