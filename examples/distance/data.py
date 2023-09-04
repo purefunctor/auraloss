@@ -61,13 +61,14 @@ class RecordingDataset(Dataset):
         data_path: Path,
         mic_pairs: dict[str, str],
         *,
-        near_is_input: bool,
+        is_enabled: bool = False,
+        near_is_input: bool = True,
         chunk_length: int = 2048,
         prefix: str = "",
     ):
         self.data_path = data_path
         self.mic_pairs = mic_pairs
-        self.near_is_input = near_is_input
+        self.is_enabled = is_enabled
         self.chunk_length = chunk_length
         self.prefix = prefix
 
@@ -132,26 +133,24 @@ class RecordingDataset(Dataset):
             f.seek(frame_index)
             input_audio = f.read(self.chunk_length, dtype="float32")
 
-        target_file = self.target_files[file_index]
-        with sf.SoundFile(target_file, "r") as f:
-            frame_index = chunk_relative * self.chunk_length
-            f.seek(frame_index)
-            target_audio = f.read(self.chunk_length, dtype="float32")
-
-        if self.near_is_input:
-            near_is_input = torch.Tensor([1.0]).unsqueeze(0)
+        if self.is_enabled:
+            target_audio = input_audio
         else:
-            near_is_input = torch.Tensor([0.0]).unsqueeze(0)
+            target_file = self.target_files[file_index]
+            with sf.SoundFile(target_file, "r") as f:
+                frame_index = chunk_relative * self.chunk_length
+                f.seek(frame_index)
+                target_audio = f.read(self.chunk_length, dtype="float32")
 
-        match = FILE_PATTERN.match(input_file.name)
-        (name, _, offset) = match.groups()
-        tag = "near_to_far" if self.near_is_input else "far_to_near"
+        if self.is_enabled:
+            is_enabled = torch.tensor([1.0])
+        else:
+            is_enabled = torch.tensor([0.0])
 
         return (
-            f"{self.prefix}_{name}_{tag}_{offset}.wav",
             torch.tensor(input_audio).unsqueeze(0),
             torch.tensor(target_audio).unsqueeze(0),
-            near_is_input,
+            is_enabled.unsqueeze(0),
         )
 
     def __len__(self) -> int:
@@ -185,39 +184,31 @@ class DistanceDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         training_dataset = []
-        for near_is_input in [True, False]:
-            training_dataset.append(RecordingDataset(
-                self.day_1_path,
-                {"67": "269", "87": "87", "103": "103"},
-                near_is_input=near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_1",
-            ))
-            training_dataset.append(RecordingDataset(
-                self.day_2_path,
-                {"67": "269", "87": "87", "103": "103"},
-                near_is_input=near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_2",
-            ))
+        for is_identity in [True, False]:
+            training_dataset.append(
+                RecordingDataset(
+                    self.day_1_path,
+                    {"67": "269", "87": "87", "103": "103"},
+                    is_identity=is_identity,
+                    near_is_input=self.near_is_input,
+                    chunk_length=self.chunk_length,
+                    prefix="day_1",
+                )
+            )
         self.training_dataset = ConcatDataset(training_dataset)
 
         validation_dataset = []
-        for near_is_input in [True, False]:
-            validation_dataset.append(RecordingDataset(
-                self.day_1_path,
-                {"414": "414"},
-                near_is_input=near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_1",
-            ))
-            validation_dataset.append(RecordingDataset(
-                self.day_2_path,
-                {"414": "414"},
-                near_is_input=near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_2",
-            ))
+        for is_identity in [True, False]:
+            validation_dataset.append(
+                RecordingDataset(
+                    self.day_2_path,
+                    {"414": "414"},
+                    is_identity=is_identity,
+                    near_is_input=self.near_is_input,
+                    chunk_length=self.chunk_length,
+                    prefix="day_2",
+                )
+            )
         self.validation_dataset = ConcatDataset(validation_dataset)
 
     def train_dataloader(self):
@@ -240,7 +231,7 @@ if __name__ == "__main__":
     per_second = RecordingDataset(
         DAY_1_FOLDER,
         {"414": "414"},
-        near_is_input=True,
+        is_enabled=False,
         chunk_length=44100,
         prefix="day_1",
     )
@@ -257,7 +248,8 @@ if __name__ == "__main__":
 
     actual_frames = 0
     for i in range(len(per_second)):
-        _, input_audio, _, near_is_input = per_second[i]
+        input_audio, target_audio, is_enabled = per_second[i]
         actual_frames += len(input_audio)
+        print(f"{i}/{len(per_second)}", end="\r")
     print("Actual length in seconds:", actual_frames)
     print("Actual length with loss:", actual_frames + apparent_loss)
