@@ -1,7 +1,6 @@
 import auraloss
-from pathlib import Path
+import math
 import pytorch_lightning as pl
-import soundfile as sf
 import torch
 
 
@@ -142,9 +141,12 @@ class TCNModule(pl.LightningModule):
         input_signal, target_signal = batch
 
         predicted_signal = self(input_signal)
+
+        input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal)
+        loss = self.loss_function(predicted_signal, target_signal) + math.e ** self.loss_function(predicted_signal, input_signal)
+
         self.log(
             "train_loss",
             loss,
@@ -164,7 +166,7 @@ class TCNModule(pl.LightningModule):
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal)
+        loss = self.loss_function(predicted_signal, target_signal) + math.e ** self.loss_function(predicted_signal, input_signal)
 
         self.log("val_loss", loss, sync_dist=True)
 
@@ -191,7 +193,7 @@ if __name__ == "__main__":
 
     model = TCNModule()
     datamodule = DistanceDataModule(
-        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768, num_workers=24
+        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768 // 2, num_workers=4
     )
 
     trainer = Trainer(max_epochs=20)

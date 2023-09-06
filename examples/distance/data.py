@@ -175,18 +175,18 @@ class DistanceDataModule(pl.LightningDataModule):
         training_dataset = [
             RecordingDataset(
                 self.day_1_path,
-                {"67": "269", "87": "87", "103": "103"},
+                {"67": "269"},
                 near_is_input=self.near_is_input,
                 chunk_length=self.chunk_length,
                 prefix="day_1",
             ),
-            RecordingDataset(
-                self.day_2_path,
-                {"67": "269", "87": "87", "103": "103"},
-                near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_2",
-            ),
+            # RecordingDataset(
+            #     self.day_2_path,
+            #     {"67": "269", "87": "87", "103": "103"},
+            #     near_is_input=self.near_is_input,
+            #     chunk_length=self.chunk_length,
+            #     prefix="day_2",
+            # ),
         ]
         self.training_dataset = ConcatDataset(training_dataset)
 
@@ -198,13 +198,13 @@ class DistanceDataModule(pl.LightningDataModule):
                 chunk_length=self.chunk_length,
                 prefix="day_1",
             ),
-            RecordingDataset(
-                self.day_2_path,
-                {"414": "414"},
-                near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_2",
-            ),
+            # RecordingDataset(
+            #     self.day_2_path,
+            #     {"414": "414"},
+            #     near_is_input=self.near_is_input,
+            #     chunk_length=self.chunk_length,
+            #     prefix="day_2",
+            # ),
         ]
         self.validation_dataset = ConcatDataset(validation_dataset)
 
