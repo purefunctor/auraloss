@@ -84,6 +84,16 @@ class TCNBlock(torch.nn.Module):
         return x
 
 
+class LossFunction(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.log_cosh = auraloss.time.LogCoshLoss()
+        self.mr_stft = auraloss.freq.MultiResolutionSTFTLoss()
+
+    def forward(self, input, target):
+        return self.log_cosh(input, target) * 0.25 + self.mr_stft(input, target) * 0.75
+
+
 class TCNModule(pl.LightningModule):
     """Temporeal convolutional network with conditioning module."""
 
@@ -104,7 +114,7 @@ class TCNModule(pl.LightningModule):
         if nparams == 0:
             raise ValueError("Must have at least one conditioning parameter.")
 
-        self.loss_function = auraloss.freq.MultiResolutionSTFTLoss()
+        self.loss_function = LossFunction()
 
         self.tcn_blocks = torch.nn.ModuleList()
         for n in range(nblocks):
@@ -145,7 +155,7 @@ class TCNModule(pl.LightningModule):
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal) + math.e ** self.loss_function(predicted_signal, input_signal)
+        loss = self.loss_function(predicted_signal, target_signal) + math.e ** (1.0 - self.loss_function(predicted_signal, input_signal))
 
         self.log(
             "train_loss",
@@ -166,7 +176,7 @@ class TCNModule(pl.LightningModule):
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal) + math.e ** self.loss_function(predicted_signal, input_signal)
+        loss = self.loss_function(predicted_signal, target_signal) + math.e ** (1.0 - self.loss_function(predicted_signal, input_signal))
 
         self.log("val_loss", loss, sync_dist=True)
 
@@ -187,14 +197,19 @@ class TCNModule(pl.LightningModule):
 if __name__ == "__main__":
     from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceDataModule
     from pytorch_lightning import Trainer
+    from pytorch_lightning.callbacks import ModelCheckpoint
+    from pytorch_lightning.loggers import WandbLogger
+
     import torch
 
     torch.set_float32_matmul_precision("high")
 
     model = TCNModule()
     datamodule = DistanceDataModule(
-        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768 // 2, num_workers=4
+        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768, num_workers=12
     )
 
-    trainer = Trainer(max_epochs=20)
+    wandb_logger = WandbLogger(project="audio-wavenet", log_model="all")
+    model_checkpoint = ModelCheckpoint(dirpath="logs", save_top_k=-1)
+    trainer = Trainer(logger=wandb_logger, max_epochs=50, callbacks=[model_checkpoint])
     trainer.fit(model, datamodule=datamodule)
