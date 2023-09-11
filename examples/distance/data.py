@@ -195,14 +195,14 @@ class DistanceDataModule(pl.LightningDataModule):
                 self.day_1_path,
                 {"414": "414"},
                 near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length,
+                chunk_length=self.chunk_length * 8,
                 prefix="day_1",
             ),
             RecordingDataset(
                 self.day_2_path,
                 {"414": "414"},
                 near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length,
+                chunk_length=self.chunk_length * 8,
                 prefix="day_2",
             ),
         ]
