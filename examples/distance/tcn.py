@@ -169,16 +169,16 @@ class TCNModule(pl.LightningModule):
 
         return loss
 
-    def validation_step(self, batch, *_):
-        input_signal, target_signal = batch
-        predicted_signal = self(input_signal)
+    # def validation_step(self, batch, *_):
+    #     input_signal, target_signal = batch
+    #     predicted_signal = self(input_signal)
 
-        input_signal = center_crop(input_signal, predicted_signal.shape)
-        target_signal = center_crop(target_signal, predicted_signal.shape)
+    #     input_signal = center_crop(input_signal, predicted_signal.shape)
+    #     target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal) + math.e ** (1.0 - self.loss_function(predicted_signal, input_signal))
+    #     loss = self.loss_function(predicted_signal, target_signal) + math.e ** (1.0 - self.loss_function(predicted_signal, input_signal))
 
-        self.log("val_loss", loss, sync_dist=True)
+    #     self.log("val_loss", loss, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr)
@@ -189,7 +189,7 @@ class TCNModule(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": lr_scheduler,
-                "monitor": "val_loss",
+                "monitor": "train_loss",
             },
         }
 
