@@ -198,7 +198,6 @@ if __name__ == "__main__":
     from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceDataModule
     from pytorch_lightning import Trainer
     from pytorch_lightning.callbacks import ModelCheckpoint
-    # from pytorch_lightning.loggers import WandbLogger
 
     import torch
 
@@ -209,8 +208,6 @@ if __name__ == "__main__":
         DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768, num_workers=8
     )
 
-    # wandb_logger = WandbLogger(project="audio-wavenet", log_model="all")
-    # model_checkpoint = ModelCheckpoint(dirpath="logs", save_top_k=-1)
-    # trainer = Trainer(logger=wandb_logger, max_epochs=50, callbacks=[model_checkpoint])
-    trainer = Trainer(max_epochs=50)
+    model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
+    trainer = Trainer(max_epochs=100, callbacks=[model_checkpoint])
     trainer.fit(model, datamodule=datamodule)
