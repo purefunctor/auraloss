@@ -1,5 +1,4 @@
 import auraloss
-import math
 import pytorch_lightning as pl
 import torch
 
@@ -204,15 +203,16 @@ if __name__ == "__main__":
     torch.set_float32_matmul_precision("high")
 
     half = True
+    if half:
+        precision = "16"
+    else:
+        precision = "32-true"
 
     model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2)
-    if half:
-        model = model.half()
-
     datamodule = DistanceAugmentDataModule(
         DAY_1_FOLDER, DAY_2_FOLDER, chunk_size=32768, num_workers=8, half=half
     )
 
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
-    trainer = Trainer(max_epochs=100, callbacks=[model_checkpoint])
+    trainer = Trainer(max_epochs=100, callbacks=[model_checkpoint], precision=precision)
     trainer.fit(model, datamodule=datamodule)
