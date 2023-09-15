@@ -195,7 +195,7 @@ class TCNModule(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceDataModule
+    from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceAugmentDataModule
     from pytorch_lightning import Trainer
     from pytorch_lightning.callbacks import ModelCheckpoint
 
@@ -203,9 +203,14 @@ if __name__ == "__main__":
 
     torch.set_float32_matmul_precision("high")
 
+    half = True
+
     model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2)
-    datamodule = DistanceDataModule(
-        DAY_1_FOLDER, DAY_2_FOLDER, chunk_length=32768, num_workers=8
+    if half:
+        model = model.half()
+
+    datamodule = DistanceAugmentDataModule(
+        DAY_1_FOLDER, DAY_2_FOLDER, chunk_size=32768, num_workers=8, half=half
     )
 
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
