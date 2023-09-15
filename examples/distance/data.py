@@ -41,122 +41,132 @@ DAY_2_FOLDER = Path("./data/day2_unsilenced")
 FILE_PATTERN = re.compile(r"^(\w+)_(\w+)_\w+_\w+_\d+_(\d+).wav$")
 
 
-def binary_search_leq(values, target):
-    left = 0
-    right = len(values) - 1
-    nearest = None
-    while left <= right:
-        mid = left + (right - left) // 2
-        if values[mid] <= target:
-            nearest = mid
-            left = mid + 1
-        else:
-            right = mid - 1
-    return nearest
-
-
-class RecordingDataset(Dataset):
+class InputTargetDataset(Dataset):
     def __init__(
         self,
-        data_path: Path,
-        mic_pairs: dict[str, str],
+        input_file: Path,
+        target_file: Path,
+        *,
+        chunk_size: int = 2048,
+        stride_factor: int = 2,
+        half: bool = False,
+    ):
+        self.input_file = input_file
+        self.target_file = target_file
+        self.chunk_size = chunk_size
+        self.stride_factor = stride_factor
+        self.stride_length = chunk_size // stride_factor
+        self.half = half
+
+    def __getitem__(self, index):
+        frame_index = index * self.stride_length
+
+        with sf.SoundFile(self.input_file, "r") as f:
+            f.seek(frame_index)
+            input_audio = f.read(
+                frames=self.chunk_size,
+                dtype="float32",
+                always_2d=True,
+                fill_value=0.0,
+            )
+            input_audio = torch.tensor(input_audio.T)
+
+        with sf.SoundFile(self.input_file, "r") as f:
+            f.seek(frame_index)
+            target_audio = f.read(
+                frames=self.chunk_size,
+                dtype="float32",
+                always_2d=True,
+                fill_value=0.0,
+            )
+            target_audio = torch.tensor(target_audio.T)
+
+        if self.half:
+            input_audio = input_audio.half()
+            target_audio = target_audio.half()
+
+        return (input_audio, target_audio)
+
+    def __len__(self):
+        with sf.SoundFile(self.input_file, "r") as f:
+            frames = f.frames
+        length = frames // self.stride_length
+        if self.stride_length > 1:
+            length += 1
+        return length
+
+
+class DistanceAugmentDataset(Dataset):
+    def __init__(
+        self,
+        files: Path,
+        pairs: dict[str, str],
         *,
         near_is_input: bool = True,
-        chunk_length: int = 2048,
-        prefix: str = "",
+        chunk_size: int = 2048,
+        stride_factor: int = 2,
+        half: bool = False,
     ):
-        self.data_path = data_path
-        self.mic_pairs = mic_pairs
-        self.chunk_length = chunk_length
-        self.prefix = prefix
+        self.files = files
+        self.pairs = pairs
+        self.near_is_input = near_is_input
+        self.chunk_size = chunk_size
+        self.stride_factor = stride_factor
+        self.half = half
 
-        self.input_files = []
-        self.target_files = []
-
-        files_per_input_offset = defaultdict(list)
-        for file_path in data_path.iterdir():
-            match = FILE_PATTERN.match(file_path.name)
+        files_per_microphone = defaultdict(list)
+        for file in self.files.iterdir():
+            match = FILE_PATTERN.match(file.name)
             if match is None:
                 continue
-            (name, near_or_far, offset) = match.groups()
-            files = files_per_input_offset[(name, near_or_far)]
-            files.append((file_path, offset))
+            (microphone, near_or_far, offset) = match.groups()
+            files_per_microphone[(microphone, near_or_far)].append((file, offset))
 
-        # Two anti-patterns in one!
-        for files in files_per_input_offset.values():
-            files.sort(key=lambda x: int(x[1]))  # offset
-            for i in range(len(files)):
-                files[i] = files[i][0]  # name
+        for microphone_files in files_per_microphone.values():
+            microphone_files.sort(key=lambda x: int(x[1]))  # offset
+            for i in range(len(microphone_files)):
+                microphone_files[i] = microphone_files[i][0]  # name
 
-        for near_name, far_name in mic_pairs.items():
-            near_files = files_per_input_offset[(near_name, "near")]
-            far_files = files_per_input_offset[(far_name, "far")]
+        input_target_datasets = []
+        for near_microphone, far_microphone in pairs.items():
+            near_files = files_per_microphone[(near_microphone, "near")]
+            far_files = files_per_microphone[(far_microphone, "far")]
 
-            if near_is_input:
+            if self.near_is_input:
                 input_files, target_files = near_files, far_files
             else:
-                input_files, target_files = far_files, near_files
+                target_files, input_files = near_files, far_files
 
-            self.input_files.extend(input_files)
-            self.target_files.extend(target_files)
+            for input_file, target_file in zip(input_files, target_files):
+                input_target_datasets.append(
+                    InputTargetDataset(
+                        input_file,
+                        target_file,
+                        chunk_size=self.chunk_size,
+                        stride_factor=self.stride_factor,
+                        half=self.half,
+                    )
+                )
 
-        self._input_markers = [0]
-        self._target_markers = [0]
+        self.input_target_datasets = ConcatDataset(input_target_datasets)
 
-        # Remainder accumulators.
-        self._input_loss = 0
-        self._target_loss = 0
+    def __getitem__(self, index):
+        return self.input_target_datasets[index]
 
-        input_marker = 0
-        for input_file in self.input_files:
-            with sf.SoundFile(input_file, "r") as f:
-                self._input_loss += f.frames % chunk_length
-                input_marker += f.frames // chunk_length
-                self._input_markers.append(input_marker)
-
-        target_marker = 0
-        for target_file in self.target_files:
-            with sf.SoundFile(target_file, "r") as f:
-                self._target_loss += f.frames % chunk_length
-                target_marker += f.frames // chunk_length
-                self._target_markers.append(target_marker)
-
-    def __getitem__(self, marker: int):
-        file_index = binary_search_leq(self._input_markers, marker)
-        chunk_relative = marker - self._input_markers[file_index]
-
-        input_file = self.input_files[file_index]
-        with sf.SoundFile(input_file, "r") as f:
-            frame_index = chunk_relative * self.chunk_length
-            f.seek(frame_index)
-            input_audio = f.read(self.chunk_length, dtype="float32")
-
-        target_file = self.target_files[file_index]
-        with sf.SoundFile(target_file, "r") as f:
-            frame_index = chunk_relative * self.chunk_length
-            f.seek(frame_index)
-            target_audio = f.read(self.chunk_length, dtype="float32")
-
-        return (
-            torch.tensor(input_audio).unsqueeze(0),
-            torch.tensor(target_audio).unsqueeze(0),
-        )
-
-    def __len__(self) -> int:
-        i = self._input_markers[-1]
-        t = self._target_markers[-1]
-        assert i == t
-        return i
+    def __len__(self):
+        return len(self.input_target_datasets)
 
 
-class DistanceDataModule(pl.LightningDataModule):
+class DistanceAugmentDataModule(pl.LightningDataModule):
     def __init__(
         self,
         day_1_path: Path,
         day_2_path: Path,
         *,
         near_is_input: bool = True,
-        chunk_length: int = 2048,
+        chunk_size: int = 2048,
+        stride_factor: int = 2,
+        half: bool = False,
         shuffle: bool = True,
         batch_size: int = 64,
         num_workers: int = 0,
@@ -165,7 +175,9 @@ class DistanceDataModule(pl.LightningDataModule):
         self.day_1_path = day_1_path
         self.day_2_path = day_2_path
         self.near_is_input = near_is_input
-        self.chunk_length = chunk_length
+        self.chunk_size = chunk_size
+        self.stride_factor = stride_factor
+        self.half = half
 
         self.shuffle = shuffle
         self.batch_size = batch_size
@@ -173,38 +185,28 @@ class DistanceDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         training_dataset = [
-            RecordingDataset(
-                self.day_1_path,
+            DistanceAugmentDataset(
+                files,
                 {"67": "269", "87": "87", "103": "103"},
                 near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_1",
-            ),
-            RecordingDataset(
-                self.day_2_path,
-                {"67": "269", "87": "87", "103": "103"},
-                near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length,
-                prefix="day_2",
-            ),
+                chunk_size=self.chunk_size,
+                stride_factor=self.stride_factor,
+                half=self.half,
+            )
+            for files in [self.day_1_path, self.day_2_path]
         ]
         self.training_dataset = ConcatDataset(training_dataset)
 
         validation_dataset = [
-            RecordingDataset(
-                self.day_1_path,
+            DistanceAugmentDataset(
+                files,
                 {"414": "414"},
                 near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length * 8,
-                prefix="day_1",
-            ),
-            RecordingDataset(
-                self.day_2_path,
-                {"414": "414"},
-                near_is_input=self.near_is_input,
-                chunk_length=self.chunk_length * 8,
-                prefix="day_2",
-            ),
+                chunk_size=self.chunk_size,
+                stride_factor=self.stride_factor,
+                half=self.half,
+            )
+            for files in [self.day_1_path, self.day_2_path]
         ]
         self.validation_dataset = ConcatDataset(validation_dataset)
 
@@ -222,30 +224,3 @@ class DistanceDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
         )
-
-
-if __name__ == "__main__":
-    per_second = RecordingDataset(
-        DAY_1_FOLDER,
-        {"414": "414"},
-        chunk_length=44100,
-        prefix="day_1",
-    )
-
-    input_frames = 0
-    for input_file in per_second.input_files:
-        with sf.SoundFile(input_file, "r") as f:
-            input_frames += f.frames
-    print("Lossless length in seconds:", input_frames / 44100)
-
-    print("Available length in seconds:", len(per_second))
-    apparent_loss = per_second._target_loss / 44100
-    print("Apparent loss in seconds", apparent_loss)
-
-    actual_frames = 0
-    for i in range(len(per_second)):
-        input_audio, target_audio = per_second[i]
-        actual_frames += len(input_audio)
-        print(f"{i}/{len(per_second)}", end="\r")
-    print("Actual length in seconds:", actual_frames)
-    print("Actual length with loss:", actual_frames + apparent_loss)

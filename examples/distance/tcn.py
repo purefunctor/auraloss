@@ -155,7 +155,7 @@ class TCNModule(pl.LightningModule):
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal) + math.e ** (1.0 - self.loss_function(predicted_signal, input_signal))
+        loss = self.loss_function(predicted_signal, target_signal)
 
         self.log(
             "train_loss",
@@ -176,7 +176,7 @@ class TCNModule(pl.LightningModule):
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal) + math.e ** (1.0 - self.loss_function(predicted_signal, input_signal))
+        loss = self.loss_function(predicted_signal, target_signal)
 
         self.log("val_loss", loss, sync_dist=True)
 
