@@ -255,7 +255,7 @@ if __name__ == "__main__":
         # near_is_input=True,
     )
 
-    wandb_logger = WandbLogger(name="distance-near-to-far")
+    wandb_logger = WandbLogger(project="distance-near-to-far")
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
     trainer = Trainer(max_epochs=20, callbacks=[model_checkpoint], precision=precision, logger=wandb_logger)
     trainer.fit(
