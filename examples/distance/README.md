@@ -10,7 +10,7 @@ $ pip install torchaudio soundfile lightning pandas
 # Training
 
 ```bash
-$ python train.py
+$ python tcn.py
 ```
 
 # Inference

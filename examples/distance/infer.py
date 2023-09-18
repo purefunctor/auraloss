@@ -3,7 +3,7 @@ from tcn import TCNModule
 import torch
 
 tcn = TCNModule.load_from_checkpoint(
-    "lightning_logs/version_10/checkpoints/epoch=65-step=256806.ckpt"
+    "lightning_logs/version_14/checkpoints/epoch=15-step=31136.ckpt"
 )
 tcn.eval()
 tcn.to("cuda")
