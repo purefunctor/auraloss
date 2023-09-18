@@ -1,10 +1,5 @@
-import os
 import torch
-import torchaudio
-import numpy as np
 import pytorch_lightning as pl
-from argparse import ArgumentParser
-
 import auraloss
 
 
@@ -112,7 +107,6 @@ class TCNModel(pl.LightningModule):
         channel_width (int): When channel_growth = 1 all blocks use convolutions with this many channels. Default: 64
         stack_size (int): Number of blocks that constitute a single stack of blocks. Default: 10
         depthwise (bool): Use depthwise-separable convolutions to reduce the total number of parameters. Default: False
-        num_examples (int): Number of evaluation audio examples to log after each epochs. Default: 4
     """
 
     def __init__(
@@ -127,12 +121,12 @@ class TCNModel(pl.LightningModule):
         channel_width=64,
         stack_size=10,
         depthwise=False,
-        num_examples=4,
-        save_dir=None,
-        **kwargs,
+        lr=0.0001,
+        train_loss="mrstft",
     ):
         super(TCNModel, self).__init__()
 
+        self.lr = lr
         self.save_hyperparameters()
 
         # setup loss functions
@@ -143,7 +137,7 @@ class TCNModel(pl.LightningModule):
         self.sisdr = auraloss.time.SISDRLoss()
         self.stft = auraloss.freq.STFTLoss()
         self.mrstft = auraloss.freq.MultiResolutionSTFTLoss()
-        self.rrstft = auraloss.freq.RandomResolutionSTFTLoss()
+        # self.rrstft = auraloss.freq.RandomResolutionSTFTLoss()
 
         if nparams > 0:
             self.gen = torch.nn.Sequential(
@@ -167,7 +161,7 @@ class TCNModel(pl.LightningModule):
                     out_ch,
                     kernel_size=kernel_size,
                     dilation=dilation,
-                    depthwise=self.hparams.depthwise,
+                    depthwise=depthwise,
                     conditional=True if nparams > 0 else False,
                 )
             )
@@ -192,15 +186,6 @@ class TCNModel(pl.LightningModule):
 
         return torch.tanh(self.output(x + skips))
 
-    def compute_receptive_field(self):
-        """Compute the receptive field in samples."""
-        rf = self.hparams.kernel_size
-        for n in range(1, self.hparams.nblocks):
-            dilation = self.hparams.dilation_growth ** (n % self.hparams.stack_size)
-            rf = rf + ((self.hparams.kernel_size - 1) * dilation)
-            rf = rf + ((self.hparams.kernel_size - 1) * 1)
-        return rf
-
     def training_step(self, batch, batch_idx):
         input, target, params = batch
 
@@ -223,8 +208,8 @@ class TCNModel(pl.LightningModule):
             loss = self.stft(pred, target)
         elif self.hparams.train_loss == "mrstft":
             loss = self.mrstft(pred, target)
-        elif self.hparams.train_loss == "rrstft":
-            loss = self.rrstft(pred, target)
+        # elif self.hparams.train_loss == "rrstft":
+        #     loss = self.rrstft(pred, target)
         else:
             raise NotImplementedError(f"Invalid loss fn: {self.hparams.train_loss}")
 
@@ -252,7 +237,7 @@ class TCNModel(pl.LightningModule):
         sisdr_loss = self.sisdr(pred, target_crop)
         stft_loss = self.stft(pred, target_crop)
         mrstft_loss = self.mrstft(pred, target_crop)
-        rrstft_loss = self.rrstft(pred, target_crop)
+        # rrstft_loss = self.rrstft(pred, target_crop)
 
         aggregate_loss = (
             l1_loss
@@ -262,7 +247,7 @@ class TCNModel(pl.LightningModule):
             + sisdr_loss
             + mrstft_loss
             + stft_loss
-            + rrstft_loss
+            # + rrstft_loss
         )
 
         self.log("val_loss", aggregate_loss)
@@ -273,130 +258,17 @@ class TCNModel(pl.LightningModule):
         self.log("val_loss/SI-SDR", sisdr_loss)
         self.log("val_loss/STFT", stft_loss)
         self.log("val_loss/MRSTFT", mrstft_loss)
-        self.log("val_loss/RRSTFT", rrstft_loss)
-
-        # move tensors to cpu for logging
-        outputs = {
-            "input": input_crop.cpu().numpy(),
-            "target": target_crop.cpu().numpy(),
-            "pred": pred.cpu().numpy(),
-            "params": params.cpu().numpy(),
-        }
-
-        return outputs
-
-    def validation_epoch_end(self, validation_step_outputs):
-        # flatten the output validation step dicts to a single dict
-        outputs = {"input": [], "target": [], "pred": [], "params": []}
-
-        for out in validation_step_outputs:
-            for key, val in out.items():
-                bs = val.shape[0]
-                for bidx in np.arange(bs):
-                    outputs[key].append(val[bidx, ...])
-
-        example_indices = np.arange(len(outputs["input"]))
-        rand_indices = np.random.choice(
-            example_indices,
-            replace=False,
-            size=np.min([len(outputs["input"]), self.hparams.num_examples]),
-        )
-
-        for idx, rand_idx in enumerate(list(rand_indices)):
-            i = outputs["input"][rand_idx].squeeze()
-            t = outputs["target"][rand_idx].squeeze()
-            p = outputs["pred"][rand_idx].squeeze()
-            prm = outputs["params"][rand_idx].squeeze()
-
-            # log audio examples
-            self.logger.experiment.add_audio(
-                f"input/{idx}",
-                i,
-                self.global_step,
-                sample_rate=self.hparams.sample_rate,
-            )
-            self.logger.experiment.add_audio(
-                f"target/{idx}",
-                t,
-                self.global_step,
-                sample_rate=self.hparams.sample_rate,
-            )
-            self.logger.experiment.add_audio(
-                f"pred/{idx}", p, self.global_step, sample_rate=self.hparams.sample_rate
-            )
-
-            if self.hparams.save_dir is not None:
-                if not os.path.isdir(self.hparams.save_dir):
-                    os.makedirs(self.hparams.save_dir)
-
-                input_filename = os.path.join(
-                    self.hparams.save_dir,
-                    f"{idx}-input-{int(prm[0]):1d}-{prm[1]:0.2f}.wav",
-                )
-                target_filename = os.path.join(
-                    self.hparams.save_dir,
-                    f"{idx}-target-{int(prm[0]):1d}-{prm[1]:0.2f}.wav",
-                )
-
-                if not os.path.isfile(input_filename):
-                    torchaudio.save(
-                        input_filename,
-                        torch.tensor(i).view(1, -1).float(),
-                        sample_rate=self.hparams.sample_rate,
-                    )
-
-                if not os.path.isfile(target_filename):
-                    torchaudio.save(
-                        target_filename,
-                        torch.tensor(t).view(1, -1).float(),
-                        sample_rate=self.hparams.sample_rate,
-                    )
-
-                torchaudio.save(
-                    os.path.join(
-                        self.hparams.save_dir,
-                        f"{idx}-pred-{self.hparams.train_loss}-{int(prm[0]):1d}-{prm[1]:0.2f}.wav",
-                    ),
-                    torch.tensor(p).view(1, -1).float(),
-                    sample_rate=self.hparams.sample_rate,
-                )
-
-    def test_step(self, batch, batch_idx):
-        return self.validation_step(batch, batch_idx)
-
-    def test_epoch_end(self, test_step_outputs):
-        return self.validation_epoch_end(test_step_outputs)
+        # self.log("val_loss/RRSTFT", rrstft_loss)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.lr)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, patience=4, verbose=True
         )
         return {
             "optimizer": optimizer,
-            "lr_scheduler": lr_scheduler,
-            "monitor": "val_loss",
+            "lr_scheduler": {
+                "scheduler": lr_scheduler,
+                "monitor": "val_loss",
+            },
         }
-
-    # add any model hyperparameters here
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        # --- model related ---
-        parser.add_argument("--ninputs", type=int, default=1)
-        parser.add_argument("--noutputs", type=int, default=1)
-        parser.add_argument("--nblocks", type=int, default=10)
-        parser.add_argument("--kernel_size", type=int, default=3)
-        parser.add_argument("--dilation_growth", type=int, default=1)
-        parser.add_argument("--channel_growth", type=int, default=1)
-        parser.add_argument("--channel_width", type=int, default=64)
-        parser.add_argument("--stack_size", type=int, default=10)
-        parser.add_argument("--depthwise", default=False, action="store_true")
-        # --- training related ---
-        parser.add_argument("--lr", type=float, default=1e-3)
-        parser.add_argument("--train_loss", type=str, default="l1")
-        # --- vadliation related ---
-        parser.add_argument("--save_dir", type=str, default=None)
-        parser.add_argument("--num_examples", type=int, default=4)
-
-        return parser
