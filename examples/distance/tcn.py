@@ -115,6 +115,15 @@ class TCNModule(pl.LightningModule):
 
         self.loss_function = LossFunction()
 
+        self.l1 = torch.nn.L1Loss()
+        self.esr = auraloss.time.ESRLoss()
+        self.dc = auraloss.time.DCLoss()
+        self.logcosh = auraloss.time.LogCoshLoss()
+        self.sisdr = auraloss.time.SISDRLoss()
+        self.stft = auraloss.freq.STFTLoss()
+        self.mrstft = auraloss.freq.MultiResolutionSTFTLoss()
+        # self.rrstft = auraloss.freq.RandomResolutionSTFTLoss()
+
         self.tcn_blocks = torch.nn.ModuleList()
         for n in range(nblocks):
             in_ch = channel_width if n > 0 else 1
@@ -175,9 +184,35 @@ class TCNModule(pl.LightningModule):
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal)
+        l1_loss = self.l1(predicted_signal, target_signal)
+        esr_loss = self.esr(predicted_signal, target_signal)
+        dc_loss = self.dc(predicted_signal, target_signal)
+        logcosh_loss = self.logcosh(predicted_signal, target_signal)
+        sisdr_loss = self.sisdr(predicted_signal, target_signal)
+        stft_loss = self.stft(predicted_signal, target_signal)
+        mrstft_loss = self.mrstft(predicted_signal, target_signal)
+        # rrstft_loss = self.rrstft(predicted_signal, target_signal)
 
-        self.log("val_loss", loss, sync_dist=True)
+        aggregate_loss = (
+            l1_loss
+            + esr_loss
+            + dc_loss
+            + logcosh_loss
+            + sisdr_loss
+            + mrstft_loss
+            + stft_loss
+            # + rrstft_loss
+        )
+
+        self.log("val_loss", aggregate_loss, sync_dist=True)
+        self.log("val_loss/L1", l1_loss, sync_dist=True)
+        self.log("val_loss/ESR", esr_loss, sync_dist=True)
+        self.log("val_loss/DC", dc_loss, sync_dist=True)
+        self.log("val_loss/LogCosh", logcosh_loss, sync_dist=True)
+        self.log("val_loss/SI-SDR", sisdr_loss, sync_dist=True)
+        self.log("val_loss/STFT", stft_loss, sync_dist=True)
+        self.log("val_loss/MRSTFT", mrstft_loss, sync_dist=True)
+        # self.log("val_loss/RRSTFT", rrstft_loss, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr)
@@ -204,15 +239,23 @@ if __name__ == "__main__":
 
     half = True
     if half:
-        precision = "16"
+        precision = "16-mixed"
     else:
         precision = "32-true"
 
-    model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2)
+    model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2, lr=0.001)
     datamodule = DistanceAugmentDataModule(
-        DAY_1_FOLDER, DAY_2_FOLDER, chunk_size=32768, num_workers=8, half=half
+        DAY_1_FOLDER,
+        DAY_2_FOLDER,
+        chunk_size=32768,
+        num_workers=8,
+        half=half,
+        batch_size=128,
     )
 
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
-    trainer = Trainer(max_epochs=100, callbacks=[model_checkpoint], precision=precision)
-    trainer.fit(model, datamodule=datamodule)
+    trainer = Trainer(max_epochs=20, callbacks=[model_checkpoint], precision=precision)
+    trainer.fit(
+        model,
+        datamodule=datamodule,
+    )
