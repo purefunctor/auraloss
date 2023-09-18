@@ -1,4 +1,7 @@
 import json
+import os
+D = [x for x in os.listdir('.') if ('o_' in x) and ('.wav' in x) and ('MX20' in x)]
+print(D)
 with open('silent_frames.json','r') as rf:
     silence = json.loads(rf.read())
     print(len(silence))
@@ -12,4 +15,4 @@ with open('silent_frames.json','r') as rf:
     TS = 0
     for x,y in O:
         TS += ((y-x)*512 // 16384)
-    print(TS)
+    
