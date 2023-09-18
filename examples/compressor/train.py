@@ -19,7 +19,8 @@ model = TCNModel(
     lr=0.001,
     train_loss="mrstft",
 )
-datamodule = CompressorDataModule(chunk_length=32768, batch_size=128, num_workers=8)
+CHUNK_LENGTH = 32768
+datamodule = CompressorDataModule(chunk_length=CHUNK_LENGTH, stride_length=CHUNK_LENGTH//4, batch_size=128, num_workers=8)
 
 wandb_logger = WandbLogger(project="unified-compressor", log_model="all")
 model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
