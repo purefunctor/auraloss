@@ -232,6 +232,7 @@ if __name__ == "__main__":
     from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceAugmentDataModule
     from pytorch_lightning import Trainer
     from pytorch_lightning.callbacks import ModelCheckpoint
+    from pytorch_lightning.loggers.wandb import WandbLogger
 
     import torch
 
@@ -254,8 +255,9 @@ if __name__ == "__main__":
         # near_is_input=True,
     )
 
+    wandb_logger = WandbLogger(name="distance-near-to-far")
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
-    trainer = Trainer(max_epochs=20, callbacks=[model_checkpoint], precision=precision)
+    trainer = Trainer(max_epochs=20, callbacks=[model_checkpoint], precision=precision, logger=wandb_logger)
     trainer.fit(
         model,
         datamodule=datamodule,

@@ -4,7 +4,13 @@
 $ python -m venv .venv
 $ source .venv/bin/activate
 $ pip install -e .  # Installs auraloss
-$ pip install torchaudio soundfile lightning pandas
+$ pip install torchaudio soundfile lightning pandas wandb
+```
+
+# Login to Wandb
+
+```bash
+$ wandb login
 ```
 
 # Training
