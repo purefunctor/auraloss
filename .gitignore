@@ -133,6 +133,7 @@ dmypy.json
 data/
 .DS_Store
 lightning_logs/
+wandb/
 
 test-env/
 *.wav
