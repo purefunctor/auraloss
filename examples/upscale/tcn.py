@@ -229,7 +229,7 @@ class TCNModule(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceAugmentDataModule
+    from data import MicroChangeDataModule
     from pytorch_lightning import Trainer
     from pytorch_lightning.callbacks import ModelCheckpoint
     from pytorch_lightning.loggers.wandb import WandbLogger
@@ -243,19 +243,17 @@ if __name__ == "__main__":
         precision = "16-mixed"
     else:
         precision = "32-true"
-
+    CHUNK_LENGTH=32768
     model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2, lr=0.001)
-    datamodule = DistanceAugmentDataModule(
-        DAY_1_FOLDER,
-        DAY_2_FOLDER,
-        chunk_size=32768,
+    datamodule = MicroChangeDataModule(
+        chunk_length=CHUNK_LENGTH,
+        stride_length=CHUNK_LENGTH//4,
         num_workers=8,
         half=half,
         batch_size=128,
-        # near_is_input=True,
     )
 
-    wandb_logger = WandbLogger(project="distance-near-to-far", log_model="all")
+    wandb_logger = WandbLogger(project="nt1-to-u67-auraloss", log_model="all")
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
     trainer = Trainer(max_epochs=20, callbacks=[model_checkpoint], precision=precision, logger=wandb_logger)
     trainer.fit(
