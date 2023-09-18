@@ -21,7 +21,7 @@ model = TCNModel(
 )
 datamodule = CompressorDataModule(chunk_length=32768, batch_size=128, num_workers=8)
 
-wandb_logger = WandbLogger(project="unified-compressor")
+wandb_logger = WandbLogger(project="unified-compressor", log_model="all")
 model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
 trainer = Trainer(max_epochs=20, precision=precision, callbacks=[model_checkpoint], logger=wandb_logger)
 
