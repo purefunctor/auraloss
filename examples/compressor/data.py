@@ -5,6 +5,7 @@ import soundfile as sf
 import torch
 from torch.utils.data import ConcatDataset, Dataset, DataLoader
 
+torchaudio.set_audio_backend("soundfile")
 
 class RecordingDataset(Dataset):
     def __init__(
@@ -22,41 +23,31 @@ class RecordingDataset(Dataset):
         self.half = half
 
     def __getitem__(self, marker: int):
-        with sf.SoundFile(f"o_x_{self.mx20}.wav", "r") as f:
             frame_index = self.stride_length * marker
-            f.seek(frame_index)
-            input_audio = f.read(self.chunk_length, dtype="float32", always_2d=True)
-            input_audio = torch.tensor(input_audio.T)
+            input_audio, _ = torchaudio.load(f"o_x_{self.mx20}.wav", frame_offset=frame_index,num_frames=self.chunk_length)
+            target_audio, _ = torchaudio.load(f"o_y_{self.mx20}.wav", frame_offset=frame_index,num_frames=self.chunk_length)
+            match self.mx20:
+                case MX20.TWO:
+                    parameters = torch.tensor([[0.2]])
+                case MX20.FOUR:
+                    parameters = torch.tensor([[0.4]])
+                case MX20.EIGHT:
+                    parameters = torch.tensor([[0.6]])
+                case MX20.TWELVE:
+                    parameters = torch.tensor([[0.8]])
+                case _:
+                    raise Exception(f"Invalid parameters {self.mx20}")
 
-        with sf.SoundFile(f"o_y_{self.mx20}.wav", "r") as f:
-            frame_index = self.chunk_length * marker
-            f.seek(frame_index)
-            target_audio = f.read(self.stride_length, dtype="float32", always_2d=True)
-            target_audio = torch.tensor(target_audio.T)
+            if self.half:
+                input_audio = input_audio.half()
+                target_audio = target_audio.half()
+                parameters = parameters.half()
 
-        match self.mx20:
-            case MX20.TWO:
-                parameters = torch.tensor([[0.2]])
-            case MX20.FOUR:
-                parameters = torch.tensor([[0.4]])
-            case MX20.EIGHT:
-                parameters = torch.tensor([[0.6]])
-            case MX20.TWELVE:
-                parameters = torch.tensor([[0.8]])
-            case _:
-                raise Exception(f"Invalid parameters {self.mx20}")
-
-        if self.half:
-            input_audio = input_audio.half()
-            target_audio = target_audio.half()
-            parameters = parameters.half()
-
-        return (
-            input_audio,
-            target_audio,
-            parameters,
-        )
-
+            return (
+                input_audio,
+                target_audio,
+                parameters,
+            )
     def __len__(self) -> int:
         return (self.num_frames - self.chunk_length) // self.stride_length
 
@@ -66,7 +57,7 @@ class CompressorDataModule(pl.LightningDataModule):
         self,
         *,
         chunk_length: int = 2048,
-        chunk_length: int = 1024,
+        stride_length: int = 1024,
         batch_size: int = 64,
         num_workers: int = 0,
         shuffle: bool = True,
