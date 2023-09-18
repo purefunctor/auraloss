@@ -34,13 +34,13 @@ class RecordingDataset(Dataset):
 
         match self.mx20:
             case MX20.TWO:
-                parameters = torch.tensor([[1.0, 0.2]])
+                parameters = torch.tensor([[0.2]])
             case MX20.FOUR:
-                parameters = torch.tensor([[1.0, 0.4]])
+                parameters = torch.tensor([[0.4]])
             case MX20.EIGHT:
-                parameters = torch.tensor([[1.0, 0.6]])
+                parameters = torch.tensor([[0.6]])
             case MX20.TWELVE:
-                parameters = torch.tensor([[1.0, 0.8]])
+                parameters = torch.tensor([[0.8]])
             case _:
                 raise Exception(f"Invalid parameters {self.mx20}")
 
