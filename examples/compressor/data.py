@@ -12,16 +12,18 @@ class RecordingDataset(Dataset):
         mx20: MX20,
         *,
         chunk_length: int = 2048,
+        stride_length: int = 1024,
         half: bool = True,
     ):
         self.mx20 = mx20
         self.chunk_length = chunk_length
+        self.stride_length = stride_length
         self.num_frames = torchaudio.info(f"o_x_{mx20}.wav").num_frames
         self.half = half
 
     def __getitem__(self, marker: int):
         with sf.SoundFile(f"o_x_{self.mx20}.wav", "r") as f:
-            frame_index = self.chunk_length * marker
+            frame_index = self.stride_length * marker
             f.seek(frame_index)
             input_audio = f.read(self.chunk_length, dtype="float32", always_2d=True)
             input_audio = torch.tensor(input_audio.T)
@@ -29,7 +31,7 @@ class RecordingDataset(Dataset):
         with sf.SoundFile(f"o_y_{self.mx20}.wav", "r") as f:
             frame_index = self.chunk_length * marker
             f.seek(frame_index)
-            target_audio = f.read(self.chunk_length, dtype="float32", always_2d=True)
+            target_audio = f.read(self.stride_length, dtype="float32", always_2d=True)
             target_audio = torch.tensor(target_audio.T)
 
         match self.mx20:
@@ -56,7 +58,7 @@ class RecordingDataset(Dataset):
         )
 
     def __len__(self) -> int:
-        return self.num_frames // self.chunk_length
+        return (self.num_frames - self.chunk_length) // self.stride_length
 
 
 class CompressorDataModule(pl.LightningDataModule):
@@ -64,6 +66,7 @@ class CompressorDataModule(pl.LightningDataModule):
         self,
         *,
         chunk_length: int = 2048,
+        chunk_length: int = 1024,
         batch_size: int = 64,
         num_workers: int = 0,
         shuffle: bool = True,
@@ -71,6 +74,7 @@ class CompressorDataModule(pl.LightningDataModule):
     ):
         super().__init__()
         self.chunk_length = chunk_length
+        self.stride_length = stride_length
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.shuffle = shuffle
@@ -78,7 +82,7 @@ class CompressorDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         datasets = [
-            RecordingDataset(mx20, chunk_length=self.chunk_length, half=self.half)
+            RecordingDataset(mx20, chunk_length=self.chunk_length, stride_length = self.stride_length, half=self.half)
             for mx20 in (MX20.TWO, MX20.FOUR, MX20.EIGHT, MX20.TWELVE)
         ]
         dataset = ConcatDataset(datasets)
