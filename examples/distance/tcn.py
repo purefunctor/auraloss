@@ -251,6 +251,7 @@ if __name__ == "__main__":
         num_workers=8,
         half=half,
         batch_size=128,
+        # near_is_input=True,
     )
 
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)

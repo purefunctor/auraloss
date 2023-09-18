@@ -13,6 +13,8 @@ $ pip install torchaudio soundfile lightning pandas
 $ python tcn.py
 ```
 
+When training far-to-near, pass `near_is_input=False` to the datamodule.
+
 # Inference
 
 Make sure to change the checkpoint file:
