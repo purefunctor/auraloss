@@ -132,6 +132,68 @@ def compressor_main():
     print("compressor-unsilenced.ckpt", compressor_unsilenced(x, p).shape)
     print("compressor-bn", compressor_bn(x).shape)
 
+    input_files = []
+    pattern = re.compile(r"^67_near_(\w+)_(\d+)_(\d+).wav$")
+    for audio_file in audio_files.iterdir():
+        match = pattern.match(audio_file.name)
+        if match is None:
+            continue
+        (singer, start, end) = match.groups()
+        input_files.append((audio_file, singer, start, end))
+
+    overrides = {
+        "67_near_Hellekka_90006112_96893396.wav": (2036892, 5272757),
+        "67_near_Hanna_176930767_186600560.wav": (3162927, 6373489),
+        "67_near_Hanna_258244414_265166192.wav": (1316161, 4555416),
+        "67_near_Aku_371016506_379433021.wav": (0, 2918831),
+        "67_near_Aku_347865343_356919995.wav": (0, 3354236),
+    }
+
+    for index, (input_file, singer, start, end) in enumerate(input_files):
+        if input_file.stem in ["67_near_Hanna_189061126_194545658", "67_near_Aku_387688563_392218764"]:
+            print("Skipping, too large")
+            continue
+        bucket_path = output_files / "compressor" / f"{singer}_{start}_{end}"
+        print(f"[{index + 1}/{len(input_files)}] {input_file.stem}")
+        if not bucket_path.exists():
+            bucket_path.mkdir(parents=True)
+
+        if input_file.name in overrides:
+            start, stop = overrides[input_file.name]
+            input_audio, _ = sf.read(
+                input_file, always_2d=True, dtype="float32", start=start, stop=stop
+            )
+        else:
+            input_audio, _ = sf.read(input_file, always_2d=True, dtype="float32")
+        
+        input_audio = torch.tensor(input_audio.T).unsqueeze(0).cuda()
+
+        for value in [0.2, 0.4, 0.6, 0.8]:
+            parameter = torch.tensor([[[value]]]).cuda()
+
+            multi = (
+                compressor_multi(input_audio, parameter)
+                .squeeze()
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            sf.write(bucket_path / f"multi_{int(value * 10)}.wav", multi, 44100)
+
+            unsilenced = (
+                compressor_unsilenced(input_audio, parameter)
+                .squeeze()
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            sf.write(
+                bucket_path / f"unsilenced_{int(value * 10)}.wav", unsilenced, 44100
+            )
+
+        single = compressor_bn(input_audio).squeeze().detach().cpu().numpy()
+        sf.write(bucket_path / f"single_4.wav", single, 44100) 
+
 
 def upscale_main():
     print("Downloading upscale weights.")
@@ -151,6 +213,6 @@ def upscale_main():
 
 
 if __name__ == "__main__":
-    distance_main()
-    # compressor_main()
+    # distance_main()
+    compressor_main()
     # upscale_main()
