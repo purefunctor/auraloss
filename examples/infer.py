@@ -21,16 +21,20 @@ def distance_main():
     far_to_near_artifact.get_path("model.ckpt").download("./weights/far-to-near/")
 
     print("Loading near-to-far.ckpt")
-    near_to_far = DistanceModel.load_from_checkpoint("./weights/near-to-far/model.ckpt").eval()
+    near_to_far = DistanceModel.load_from_checkpoint(
+        "./weights/near-to-far/model.ckpt"
+    ).eval()
 
     print("Loading far-to-near.ckpt")
-    far_to_near = DistanceModel.load_from_checkpoint("./weights/far-to-near/model.ckpt").eval()
+    far_to_near = DistanceModel.load_from_checkpoint(
+        "./weights/far-to-near/model.ckpt"
+    ).eval()
 
     print("Testing distance models.")
     x = torch.rand((1, 1, 44100)).cuda()
     print("near-to-far.ckpt", near_to_far(x).shape)
     print("far-to-near.ckpt", far_to_near(x).shape)
-    
+
     near_files = {}
     far_files = {}
     pattern = re.compile(r"^414_(\w+)_(\w+)_(\d+)_(\d+).wav$")
@@ -44,23 +48,45 @@ def distance_main():
         elif distance == "far":
             far_files[(singer, start, end)] = audio_file
 
+    overrides = {
+        "414_near_Hellekka_90006112_96893396.wav": (2036892, 5272757),
+        "414_near_Hanna_176930767_186600560.wav": (3162927, 6373489),
+        "414_near_Hanna_258244414_265166192.wav": (1316161, 4555416),
+        "414_near_Aku_371016506_379433021.wav": (0, 2918831),
+        "414_near_Aku_347865343_356919995.wav": (0, 3354236),
+    }
+
     for index, (key, near_file) in enumerate(near_files.items()):
-        print(f"Processed {index + 1}/{len(near_files)}")
+        print(f"[{index + 1}/{len(near_files)}] {near_file.stem}")
         far_file = far_files[key]
 
-        near_audio, _ = sf.read(near_file, always_2d=True, dtype="float32")
-        near_audio = torch.tensor(near_audio.T).unsqueeze(0).cuda()
+        bucket_path = output_files / "distance" / "{}_{}_{}".format(*key)
+        if not bucket_path.exists():
+            bucket_path.mkdir(parents=True)
 
-        far_audio, _ = sf.read(far_file, always_2d=True, dtype="float32")
+        if near_file.name in overrides:
+            start, stop = overrides[near_file.name]
+            near_audio, _ = sf.read(
+                near_file, always_2d=True, dtype="float32", start=start, stop=stop
+            )
+            far_audio, _ = sf.read(
+                far_file, always_2d=True, dtype="float32", start=start, stop=stop
+            )
+        else:
+            near_audio, _ = sf.read(near_file, always_2d=True, dtype="float32")
+            far_audio, _ = sf.read(far_file, always_2d=True, dtype="float32")
+
+        sf.write(bucket_path / "near.wav", near_audio, 44100)
+        sf.write(bucket_path / "far.wav", far_audio, 44100)
+
+        near_audio = torch.tensor(near_audio.T).unsqueeze(0).cuda()
         far_audio = torch.tensor(far_audio.T).unsqueeze(0).cuda()
 
         to_far = near_to_far(near_audio).squeeze().detach().cpu().numpy()
-        to_far_file = output_files / f"414_near_to_far_{key[0]}_{key[1]}_{key[2]}.wav"
-        sf.write(to_far_file, to_far, 44100)
+        sf.write(bucket_path / "to_far.wav", to_far, 44100)
 
         to_near = far_to_near(far_audio).squeeze().detach().cpu().numpy()
-        to_near_file = output_files / f"414_far_to_near_{key[0]}_{key[1]}_{key[2]}.wav"
-        sf.write(to_near_file, to_near, 44100)
+        sf.write(bucket_path / "to_near.wav", to_near, 44100)
 
 
 def compressor_main():
@@ -82,9 +108,7 @@ def compressor_main():
     compressor_bn_artifact = api.artifact(
         "meeshkan/unified-compressor-unsilenced-four/model-p1scllfo:v39"
     )
-    compressor_bn_artifact.get_path("model.ckpt").download(
-        "./weights/compressor-bn/"
-    )
+    compressor_bn_artifact.get_path("model.ckpt").download("./weights/compressor-bn/")
 
     print("Loading compressor-multi.ckpt")
     compressor_multi = CompressorModel.load_from_checkpoint(
@@ -118,7 +142,9 @@ def upscale_main():
         "./weights/nt1-to-u67-auraloss/"
     )
 
-    nt1_to_u67 = UpscaleModel.load_from_checkpoint("./weights/nt1-to-u67-auraloss/model.ckpt").eval()
+    nt1_to_u67 = UpscaleModel.load_from_checkpoint(
+        "./weights/nt1-to-u67-auraloss/model.ckpt"
+    ).eval()
     print("Testing upscale models.")
     x = torch.rand((1, 1, 44100)).cuda()
     print("nt1-to-u67.ckpt", nt1_to_u67(x).shape)
