@@ -150,7 +150,10 @@ def compressor_main():
     }
 
     for index, (input_file, singer, start, end) in enumerate(input_files):
-        if input_file.stem in ["67_near_Hanna_189061126_194545658", "67_near_Aku_387688563_392218764"]:
+        if input_file.stem in [
+            "67_near_Hanna_189061126_194545658",
+            "67_near_Aku_387688563_392218764",
+        ]:
             print("Skipping, too large")
             continue
         bucket_path = output_files / "compressor" / f"{singer}_{start}_{end}"
@@ -165,7 +168,7 @@ def compressor_main():
             )
         else:
             input_audio, _ = sf.read(input_file, always_2d=True, dtype="float32")
-        
+
         input_audio = torch.tensor(input_audio.T).unsqueeze(0).cuda()
 
         for value in [0.2, 0.4, 0.6, 0.8]:
@@ -192,7 +195,7 @@ def compressor_main():
             )
 
         single = compressor_bn(input_audio).squeeze().detach().cpu().numpy()
-        sf.write(bucket_path / f"single_4.wav", single, 44100) 
+        sf.write(bucket_path / f"single_4.wav", single, 44100)
 
 
 def upscale_main():
@@ -211,8 +214,56 @@ def upscale_main():
     x = torch.rand((1, 1, 44100)).cuda()
     print("nt1-to-u67.ckpt", nt1_to_u67(x).shape)
 
+    input_files = {}
+    target_files = {}
+    pattern = re.compile(r"^(nt1|67)_(\w+)_(\w+)_(\d+)_(\d+).wav$")
+    for audio_file in audio_files.iterdir():
+        match = pattern.match(audio_file.name)
+        if match is None:
+            continue
+        (name, distance, singer, start, end) = match.groups()
+        if (name, distance) == ("nt1", "middle"):
+            input_files[(singer, start, end)] = audio_file
+        elif (name, distance) == ("67", "near"):
+            target_files[(singer, start, end)] = audio_file
+
+    for index, (key, input_file) in enumerate(input_files.items()):
+        print(f"[{index + 1}/{len(input_files)}] {input_file.stem}")
+        target_file = target_files[key]
+
+        bucket_path = output_files / "upscale" / "{}_{}_{}".format(*key)
+        if not bucket_path.exists():
+            bucket_path.mkdir(parents=True)
+
+        overrides = {
+            "nt1_middle_Hellekka_90006112_96893396.wav": (2036892, 5272757),
+            "nt1_middle_Hanna_176930767_186600560.wav": (3162927, 6373489),
+            "nt1_middle_Hanna_258244414_265166192.wav": (1316161, 4555416),
+            "nt1_middle_Aku_371016506_379433021.wav": (0, 2918831),
+            "nt1_middle_Aku_347865343_356919995.wav": (0, 3354236),
+        }
+
+        if input_file.name in overrides:
+            start, stop = overrides[input_file.name]
+            input_audio, _ = sf.read(
+                input_file, always_2d=True, dtype="float32", start=start, stop=stop
+            )
+            target_audio, _ = sf.read(
+                target_file, always_2d=True, dtype="float32", start=start, stop=stop
+            )
+        else:
+            input_audio, _ = sf.read(input_file, always_2d=True, dtype="float32")
+            target_audio, _ = sf.read(target_file, always_2d=True, dtype="float32")
+
+        sf.write(bucket_path / "input.wav", input_audio, 44100)
+        sf.write(bucket_path / "target.wav", target_audio, 44100)
+
+        input_audio = torch.tensor(input_audio.T).unsqueeze(0).cuda()
+        to_far = nt1_to_u67(input_audio).squeeze().detach().cpu().numpy()
+        sf.write(bucket_path / "upscaled.wav", to_far, 44100)
+
 
 if __name__ == "__main__":
     # distance_main()
-    compressor_main()
-    # upscale_main()
+    # compressor_main()
+    upscale_main()
