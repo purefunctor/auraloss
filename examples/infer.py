@@ -1,11 +1,16 @@
 from distance.tcn import TCNModule as DistanceModel
 from compressor.tcn import TCNModel as CompressorModel
 from upscale.tcn import TCNModule as UpscaleModel
+from pathlib import Path
+import re
+import soundfile as sf
 import torch
 import wandb
 
 
 api = wandb.Api()
+audio_files = Path.cwd() / "data"
+output_files = Path.cwd() / "out"
 
 
 def distance_main():
@@ -25,6 +30,37 @@ def distance_main():
     x = torch.rand((1, 1, 44100)).cuda()
     print("near-to-far.ckpt", near_to_far(x).shape)
     print("far-to-near.ckpt", far_to_near(x).shape)
+    
+    near_files = {}
+    far_files = {}
+    pattern = re.compile(r"^414_(\w+)_(\w+)_(\d+)_(\d+).wav$")
+    for audio_file in audio_files.iterdir():
+        match = pattern.match(audio_file.name)
+        if match is None:
+            continue
+        (distance, singer, start, end) = match.groups()
+        if distance == "near":
+            near_files[(singer, start, end)] = audio_file
+        elif distance == "far":
+            far_files[(singer, start, end)] = audio_file
+
+    for index, (key, near_file) in enumerate(near_files.items()):
+        print(f"Processed {index + 1}/{len(near_files)}")
+        far_file = far_files[key]
+
+        near_audio, _ = sf.read(near_file, always_2d=True, dtype="float32")
+        near_audio = torch.tensor(near_audio.T).unsqueeze(0).cuda()
+
+        far_audio, _ = sf.read(far_file, always_2d=True, dtype="float32")
+        far_audio = torch.tensor(far_audio.T).unsqueeze(0).cuda()
+
+        to_far = near_to_far(near_audio).squeeze().detach().cpu().numpy()
+        to_far_file = output_files / f"414_near_to_far_{key[0]}_{key[1]}_{key[2]}.wav"
+        sf.write(to_far_file, to_far, 44100)
+
+        to_near = far_to_near(far_audio).squeeze().detach().cpu().numpy()
+        to_near_file = output_files / f"414_far_to_near_{key[0]}_{key[1]}_{key[2]}.wav"
+        sf.write(to_near_file, to_near, 44100)
 
 
 def compressor_main():
@@ -90,5 +126,5 @@ def upscale_main():
 
 if __name__ == "__main__":
     distance_main()
-    compressor_main()
-    upscale_main()
+    # compressor_main()
+    # upscale_main()
