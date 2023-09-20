@@ -79,7 +79,6 @@ class TCNModule(pl.LightningModule):
 
     def __init__(
         self,
-        nparams: int = 1,
         nblocks: int = 10,
         kernel_size: int = 3,
         dilation_growth: int = 1,
@@ -90,9 +89,6 @@ class TCNModule(pl.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-
-        if nparams == 0:
-            raise ValueError("Must have at least one conditioning parameter.")
 
         self.loss_function = LossFunction()
 
