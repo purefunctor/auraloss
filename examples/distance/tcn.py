@@ -9,25 +9,6 @@ def center_crop(x, shape):
     return x[..., start:stop]
 
 
-class FiLM(torch.nn.Module):
-    def __init__(self, num_features, cond_dim):
-        super().__init__()
-        self.num_features = num_features
-        self.bn = torch.nn.BatchNorm1d(num_features, affine=False)
-        self.adaptor = torch.nn.Linear(cond_dim, num_features * 2)
-
-    def forward(self, x, cond):
-        cond = self.adaptor(cond)
-        g, b = torch.chunk(cond, 2, dim=-1)
-        g = g.permute(0, 2, 1)
-        b = b.permute(0, 2, 1)
-
-        x = self.bn(x)  # apply BatchNorm without affine
-        x = (x * g) + b  # then apply conditional affine
-
-        return x
-
-
 class TCNBlock(torch.nn.Module):
     def __init__(
         self,
