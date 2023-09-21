@@ -134,7 +134,7 @@ class TCNModule(pl.LightningModule):
             if index == 0:
                 skips = x
             else:
-                if self.causal:
+                if self.hparams.causal:
                     skips = causal_crop(skips, x.shape[-1]) + x
                 else:
                     skips = center_crop(skips, x.shape[-1]) + x
