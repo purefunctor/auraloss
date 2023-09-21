@@ -3,9 +3,15 @@ import pytorch_lightning as pl
 import torch
 
 
-def center_crop(x, shape):
-    start = (x.shape[-1] - shape[-1]) // 2
-    stop = start + shape[-1]
+def center_crop(x, length: int):
+    start = (x.shape[-1] - length) // 2
+    stop = start + length
+    return x[..., start:stop]
+
+
+def causal_crop(x, length: int):
+    stop = x.shape[-1] - 1
+    start = stop - length
     return x[..., start:stop]
 
 
@@ -17,7 +23,8 @@ class TCNBlock(torch.nn.Module):
         kernel_size=3,
         padding=0,
         dilation=1,
-        depthwise=False,
+        # depthwise=False,
+        causal=True,
     ):
         super().__init__()
 
@@ -26,9 +33,10 @@ class TCNBlock(torch.nn.Module):
         self.kernel_size = kernel_size
         self.padding = padding
         self.dilation = dilation
-        self.depthwise = depthwise
+        # self.depthwise = depthwise
+        self.causal = causal
 
-        groups = out_ch if depthwise and (in_ch % out_ch == 0) else 1
+        # groups = out_ch if depthwise and (in_ch % out_ch == 0) else 1
 
         self.conv1 = torch.nn.Conv1d(
             in_ch,
@@ -36,11 +44,11 @@ class TCNBlock(torch.nn.Module):
             kernel_size=kernel_size,
             padding=padding,
             dilation=dilation,
-            groups=groups,
+            # groups=groups,
             bias=False,
         )
-        if depthwise:
-            self.conv1b = torch.nn.Conv1d(out_ch, out_ch, kernel_size=1)
+        # if depthwise:
+        #     self.conv1b = torch.nn.Conv1d(out_ch, out_ch, kernel_size=1)
 
         self.bn = torch.nn.BatchNorm1d(out_ch)
 
@@ -59,7 +67,11 @@ class TCNBlock(torch.nn.Module):
         x = self.relu(x)
 
         x_res = self.res(x_in)
-        x = x + center_crop(x_res, x.shape)
+
+        if self.causal:
+            x = x + causal_crop(x_res, x.shape[-1])
+        else:
+            x = x + center_crop(x_res, x.shape[-1])
 
         return x
 
@@ -119,15 +131,16 @@ class TCNModule(pl.LightningModule):
         self.reduce_output = torch.nn.Conv1d(out_ch, 1, kernel_size=1)
         self.final_activation = torch.nn.Tanh()
 
-        # self.validation_epoch_outputs = []
-
     def forward(self, x):
         for index, tcn_block in enumerate(self.tcn_blocks):
             x = tcn_block(x)
             if index == 0:
                 skips = x
             else:
-                skips = center_crop(skips, x.shape) + x
+                if self.causal:
+                    skips = causal_crop(skips, x.shape[-1]) + x
+                else:
+                    skips = center_crop(skips, x.shape[-1]) + x
         x = self.reduce_output(x + skips)
         x = self.final_activation(x)
         return x
@@ -137,8 +150,12 @@ class TCNModule(pl.LightningModule):
 
         predicted_signal = self(input_signal)
 
-        input_signal = center_crop(input_signal, predicted_signal.shape)
-        target_signal = center_crop(target_signal, predicted_signal.shape)
+        if self.causal:
+            input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
+            target_signal = causal_crop(target_signal, predicted_signal.shape[-1])
+        else:
+            input_signal = center_crop(input_signal, predicted_signal.shape[-1])
+            target_signal = center_crop(target_signal, predicted_signal.shape[-1])
 
         loss = self.loss_function(predicted_signal, target_signal)
 
@@ -158,8 +175,12 @@ class TCNModule(pl.LightningModule):
         input_signal, target_signal = batch
         predicted_signal = self(input_signal)
 
-        input_signal = center_crop(input_signal, predicted_signal.shape)
-        target_signal = center_crop(target_signal, predicted_signal.shape)
+        if self.causal:
+            input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
+            target_signal = causal_crop(target_signal, predicted_signal.shape[-1])
+        else:
+            input_signal = center_crop(input_signal, predicted_signal.shape[-1])
+            target_signal = center_crop(target_signal, predicted_signal.shape[-1])
 
         l1_loss = self.l1(predicted_signal, target_signal)
         esr_loss = self.esr(predicted_signal, target_signal)
@@ -168,7 +189,6 @@ class TCNModule(pl.LightningModule):
         sisdr_loss = self.sisdr(predicted_signal, target_signal)
         stft_loss = self.stft(predicted_signal, target_signal)
         mrstft_loss = self.mrstft(predicted_signal, target_signal)
-        # rrstft_loss = self.rrstft(predicted_signal, target_signal)
 
         aggregate_loss = (
             l1_loss
@@ -178,7 +198,6 @@ class TCNModule(pl.LightningModule):
             + sisdr_loss
             + mrstft_loss
             + stft_loss
-            # + rrstft_loss
         )
 
         self.log("val_loss", aggregate_loss, sync_dist=True)
@@ -189,7 +208,6 @@ class TCNModule(pl.LightningModule):
         self.log("val_loss/SI-SDR", sisdr_loss, sync_dist=True)
         self.log("val_loss/STFT", stft_loss, sync_dist=True)
         self.log("val_loss/MRSTFT", mrstft_loss, sync_dist=True)
-        # self.log("val_loss/RRSTFT", rrstft_loss, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr)
