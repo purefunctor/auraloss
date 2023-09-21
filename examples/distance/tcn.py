@@ -147,7 +147,9 @@ class TCNModule(pl.LightningModule):
         receptive_field = self.hparams.kernel_size
         for index in range(1, self.hparams.nblocks):
             dilation = self.hparams.dilation_growth ** (index % self.hparams.stack_size)
-            receptive_field = receptive_field + ((self.hparams.kernel_size - 1) * dilation)
+            receptive_field = receptive_field + (
+                (self.hparams.kernel_size - 1) * dilation
+            )
         return receptive_field
 
     def training_step(self, batch, *_):
@@ -155,7 +157,7 @@ class TCNModule(pl.LightningModule):
 
         predicted_signal = self(input_signal)
 
-        if self.causal:
+        if self.hparams.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
             target_signal = causal_crop(target_signal, predicted_signal.shape[-1])
         else:
@@ -180,7 +182,7 @@ class TCNModule(pl.LightningModule):
         input_signal, target_signal = batch
         predicted_signal = self(input_signal)
 
-        if self.causal:
+        if self.hparams.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
             target_signal = causal_crop(target_signal, predicted_signal.shape[-1])
         else:
@@ -226,44 +228,3 @@ class TCNModule(pl.LightningModule):
                 "monitor": "val_loss",
             },
         }
-
-
-if __name__ == "__main__":
-    from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceAugmentDataModule
-    from pytorch_lightning import Trainer
-    from pytorch_lightning.callbacks import ModelCheckpoint
-    from pytorch_lightning.loggers.wandb import WandbLogger
-
-    import torch
-
-    torch.set_float32_matmul_precision("high")
-
-    half = True
-    if half:
-        precision = "16-mixed"
-    else:
-        precision = "32-true"
-
-    model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2, lr=0.001)
-    datamodule = DistanceAugmentDataModule(
-        DAY_1_FOLDER,
-        DAY_2_FOLDER,
-        chunk_size=32768,
-        num_workers=8,
-        half=half,
-        batch_size=128,
-        # near_is_input=True,
-    )
-
-    wandb_logger = WandbLogger(project="distance-near-to-far", log_model="all")
-    model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
-    trainer = Trainer(
-        max_epochs=20,
-        callbacks=[model_checkpoint],
-        precision=precision,
-        logger=wandb_logger,
-    )
-    trainer.fit(
-        model,
-        datamodule=datamodule,
-    )

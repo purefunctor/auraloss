@@ -1,0 +1,60 @@
+from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceAugmentDataModule
+from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers.wandb import WandbLogger
+from tcn import TCNModule
+import torch
+
+torch.set_float32_matmul_precision("high")
+
+half = True
+if half:
+    precision = "16-mixed"
+else:
+    precision = "32-true"
+
+configuration = {
+    "uTCN-100-C": {
+        "nblocks": 4,
+        "dilation_growth": 10,
+        "kernel_size": 5,
+        "causal": True,
+        "channel_width": 32,
+        "lr": 0.001,
+    },
+    "uTCN-300-C": {
+        "nblocks": 4,
+        "dilation_growth": 10,
+        "kernel_size": 13,
+        "channel_width": 32,
+        "causal": True,
+        "lr": 0.001,
+    },
+}
+
+model = TCNModule(**configuration["uTCN-100-C"])
+datamodule = DistanceAugmentDataModule(
+    DAY_1_FOLDER,
+    DAY_2_FOLDER,
+    chunk_size=32768,
+    num_workers=8,
+    half=half,
+    batch_size=32,
+    near_is_input=True,
+)
+
+wandb_logger = WandbLogger(project="near-to-far", log_model="all")
+wandb_logger.experiment.config["receptive_field"] = model.compute_receptive_field()
+
+model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
+trainer = Trainer(
+    max_epochs=20,
+    callbacks=[model_checkpoint],
+    precision=precision,
+    logger=wandb_logger,
+)
+
+trainer.fit(
+    model,
+    datamodule=datamodule,
+)
