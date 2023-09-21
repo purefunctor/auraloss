@@ -1,10 +1,15 @@
 from tcn import TCNModule
 import torch
+import wandb
 
 
 if __name__ == "__main__":
-    model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2, lr=0.001)
-    x = torch.rand((1, 1, 44100))
+    api = wandb.Api()
+
+    artifact = api.artifact("meeshkan/distance-near-to-far/model-92cbh8ab:v19")
+    weights = artifact.get_path("model.ckpt").download("/tmp")
+    model = TCNModule.load_from_checkpoint(weights).eval()
+    x = torch.rand((1, 1, 44100 // 4))
     model.to_onnx(
         "micro-tcn-static.onnx",
         x,
