@@ -61,8 +61,6 @@ class TCNBlock(torch.nn.Module):
         x_in = x
 
         x = self.conv1(x)
-        if self.depthwise:
-            x = self.conv1b(x)
         x = self.bn(x)
         x = self.relu(x)
 
@@ -96,7 +94,7 @@ class TCNModule(pl.LightningModule):
         dilation_growth: int = 1,
         channel_width: int = 64,
         stack_size: int = 10,
-        depthwise: bool = False,
+        causal: bool = True,
         lr=0.0001,
     ):
         super().__init__()
@@ -111,7 +109,6 @@ class TCNModule(pl.LightningModule):
         self.sisdr = auraloss.time.SISDRLoss()
         self.stft = auraloss.freq.STFTLoss()
         self.mrstft = auraloss.freq.MultiResolutionSTFTLoss()
-        # self.rrstft = auraloss.freq.RandomResolutionSTFTLoss()
 
         self.tcn_blocks = torch.nn.ModuleList()
         for n in range(nblocks):
@@ -124,7 +121,7 @@ class TCNModule(pl.LightningModule):
                     out_ch,
                     kernel_size=kernel_size,
                     dilation=dilation,
-                    depthwise=depthwise,
+                    causal=causal,
                 )
             )
 
