@@ -252,7 +252,12 @@ if __name__ == "__main__":
 
     wandb_logger = WandbLogger(project="distance-near-to-far", log_model="all")
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
-    trainer = Trainer(max_epochs=20, callbacks=[model_checkpoint], precision=precision, logger=wandb_logger)
+    trainer = Trainer(
+        max_epochs=20,
+        callbacks=[model_checkpoint],
+        precision=precision,
+        logger=wandb_logger,
+    )
     trainer.fit(
         model,
         datamodule=datamodule,
