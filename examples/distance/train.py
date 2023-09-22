@@ -30,20 +30,28 @@ configuration = {
         "causal": True,
         "lr": 0.001,
     },
+    "TCN-324-C": {
+        "nblocks": 10,
+        "dilation_growth": 2,
+        "kernel_size": 15,
+        "channel_width": 32,
+        "causal": True,
+        "lr": 0.001,
+    },
 }
 
-model = TCNModule(**configuration["uTCN-100-C"])
+model = TCNModule(**configuration["TCN-324-C"])
 datamodule = DistanceAugmentDataModule(
     DAY_1_FOLDER,
     DAY_2_FOLDER,
     chunk_size=32768,
-    num_workers=8,
+    num_workers=16,
     half=half,
-    batch_size=32,
+    batch_size=128,
     near_is_input=True,
 )
 
-wandb_logger = WandbLogger(project="near-to-far", log_model="all")
+wandb_logger = WandbLogger(project="near-to-far", name="TCN-324-C", log_model="all")
 wandb_logger.experiment.config["receptive_field"] = model.compute_receptive_field()
 
 model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
