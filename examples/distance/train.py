@@ -4,6 +4,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers.wandb import WandbLogger
 from tcn import TCNModule
 import torch
+import wandb
 
 torch.set_float32_matmul_precision("high")
 
@@ -14,14 +15,14 @@ else:
     precision = "32-true"
 
 configuration = {
-    "uTCN-100-C": {
-        "nblocks": 4,
-        "dilation_growth": 10,
-        "kernel_size": 5,
-        "causal": True,
-        "channel_width": 32,
-        "lr": 0.001,
-    },
+    # "uTCN-100-C": {
+    #     "nblocks": 4,
+    #     "dilation_growth": 10,
+    #     "kernel_size": 5,
+    #     "causal": True,
+    #     "channel_width": 32,
+    #     "lr": 0.001,
+    # },
     "uTCN-300-C": {
         "nblocks": 4,
         "dilation_growth": 10,
@@ -87,3 +88,5 @@ for n, p in configuration.items():
         model,
         datamodule=datamodule,
     )
+
+    wandb.finish()

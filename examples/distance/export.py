@@ -4,25 +4,24 @@ import wandb
 
 api = wandb.Api()
 
-artifact = api.artifact("meeshkan/near-to-far/model-jwwpp85x:v19")
-weights = artifact.get_path("model.ckpt").download("/tmp")
-model = TCNModule.load_from_checkpoint(weights).eval()
+artifacts = [
+    "meeshkan/near-to-far/model-w2sg3k9w:v19",
+    "meeshkan/near-to-far/model-sdl0oecr:v19",
+    "meeshkan/near-to-far/model-t02dv6ru:v19",
+    "meeshkan/near-to-far/model-qj6nboda:v19",
+]
 
-for s in [512, 1024, 2048]:
-    x = torch.rand((1, 1, s + model.compute_receptive_field()))
-    model.to_onnx(
-        f"near-to-far-{s}-{model.compute_receptive_field()}.onnx",
-        x,
-        input_names=["input"],
-        output_names=["output"],
-        # dynamic_axes={
-        #     "input": {
-        #         0: "batch_size",
-        #         2: "samples",
-        #     },
-        #     "output": {
-        #         0: "batch_size",
-        #         2: "samples",
-        #     },
-        # },
-    )
+for artifact in artifacts:
+    artifact = api.artifact(artifact)
+    weights = artifact.get_path("model.ckpt").download("/tmp")
+    model = TCNModule.load_from_checkpoint(weights).eval()
+    r = model.compute_receptive_field()
+
+    for s in [512, 1024, 2048]:
+        x = torch.rand((1, 1, s + r))
+        model.to_onnx(
+            f"exports/{artifact.logged_by().name}-{s}.onnx",
+            x,
+            input_names=["input"],
+            output_names=["output"],
+        )
