@@ -59,7 +59,7 @@ configuration = {
         "nblocks": 10,
         "dilation_growth": 2,
         "kernel_size": 15,
-        "channel_width": 32,
+        "channel_width": 96,
         "causal": True,
         "lr": 0.001,
     },
