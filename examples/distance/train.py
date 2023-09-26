@@ -56,7 +56,7 @@ configuration = {
     #     "lr": 0.001,
     # },
     "TCN-324-C-FiLM": {
-        "nparams": 1,
+        "nparams": 3,
         "nblocks": 10,
         "dilation_growth": 2,
         "kernel_size": 15,

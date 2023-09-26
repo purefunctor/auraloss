@@ -160,10 +160,9 @@ class TCNModule(pl.LightningModule):
         self.reduce_output = torch.nn.Conv1d(out_ch, 1, kernel_size=1)
         self.final_activation = torch.nn.Tanh()
 
-        receptive_field = self.compute_receptive_field()
         self.guess_parameters = torch.nn.Sequential(
             torch.nn.Flatten(),
-            torch.nn.Linear(receptive_field, 3),
+            torch.nn.LazyLinear(3),
         )
 
     def forward(self, x, p):
@@ -179,7 +178,7 @@ class TCNModule(pl.LightningModule):
                     skips = center_crop(skips, x.shape[-1]) + x
         x = self.reduce_output(x + skips)
         x = self.final_activation(x)
-        q = self.guess_parameters(p)
+        q = self.guess_parameters(x)
         return (x, q)
 
     def compute_receptive_field(self):
@@ -204,7 +203,7 @@ class TCNModule(pl.LightningModule):
             input_signal = center_crop(input_signal, predicted_signal.shape[-1])
             target_signal = center_crop(target_signal, predicted_signal.shape[-1])
 
-        parameter_labels = parameters.argmax(dim=-1)
+        parameter_labels = parameters.argmax(dim=-1).squeeze()
 
         audio_loss = self.loss_function(predicted_signal, target_signal)
         parameter_loss = self.cross_entropy_loss(parameter_scores, parameter_labels)

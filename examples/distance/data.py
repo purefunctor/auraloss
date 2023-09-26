@@ -88,11 +88,11 @@ class InputTargetDataset(Dataset):
 
         match self.singer_position:
             case "close":
-                position_parameter = torch.tensor([[0.0]])
+                position_parameter = torch.tensor([[1.0, 0.0, 0.0]])
             case "mid":
-                position_parameter = torch.tensor([[0.5]])
+                position_parameter = torch.tensor([[0.0, 1.0, 0.0]])
             case "far":
-                position_parameter = torch.tensor([[1.0]])
+                position_parameter = torch.tensor([[0.0, 0.0, 1.0]])
             case _:
                 raise Exception("Failed to parse singer position.")
 
