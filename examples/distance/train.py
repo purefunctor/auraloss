@@ -80,11 +80,13 @@ for n, p in configuration.items():
     )
 
     wandb_logger = WandbLogger(project="near-to-far", name=f"{n}", log_model="all")
-    wandb_logger.experiment.config.update({
-        "receptive_field": model.compute_receptive_field(),
-        "batch_size": datamodule.batch_size,
-        "chunk_size": datamodule.chunk_size,
-    })
+    wandb_logger.experiment.config.update(
+        {
+            "receptive_field": model.compute_receptive_field(),
+            "batch_size": datamodule.batch_size,
+            "chunk_size": datamodule.chunk_size,
+        }
+    )
 
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
     trainer = Trainer(

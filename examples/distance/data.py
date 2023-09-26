@@ -131,12 +131,17 @@ class DistanceAugmentDataset(Dataset):
             if match is None:
                 continue
             (microphone, near_or_far, position, offset) = match.groups()
-            files_per_microphone[(microphone, near_or_far)].append((file, position, offset))
+            files_per_microphone[(microphone, near_or_far)].append(
+                (file, position, offset)
+            )
 
         for microphone_files in files_per_microphone.values():
             microphone_files.sort(key=lambda x: int(x[2]))  # offset
             for i in range(len(microphone_files)):
-                microphone_files[i] = (microphone_files[i][0], microphone_files[i][1])  # name, position
+                microphone_files[i] = (
+                    microphone_files[i][0],
+                    microphone_files[i][1],
+                )  # name, position
 
         input_target_datasets = []
         for near_microphone, far_microphone in pairs.items():
@@ -148,7 +153,9 @@ class DistanceAugmentDataset(Dataset):
             else:
                 target_files, input_files = near_files, far_files
 
-            for (input_file, input_position), (target_file, target_position) in zip(input_files, target_files):
+            for (input_file, input_position), (target_file, target_position) in zip(
+                input_files, target_files
+            ):
                 assert input_position == target_position
                 input_target_datasets.append(
                     InputTargetDataset(
@@ -240,7 +247,8 @@ class DistanceAugmentDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    d = DistanceAugmentDataset(DAY_1_FOLDER, {"67": "269"}, chunk_size=44100 * 100, stride_factor=1)
+    d = DistanceAugmentDataset(
+        DAY_1_FOLDER, {"67": "269"}, chunk_size=44100 * 100, stride_factor=1
+    )
     for i in range(len(d)):
         print(d[i][2])
-

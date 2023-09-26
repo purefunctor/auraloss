@@ -23,7 +23,6 @@ class FiLM(torch.nn.Module):
         self.adaptor = torch.nn.Linear(cond_dim, num_features * 2)
 
     def forward(self, x, cond):
-
         cond = self.adaptor(cond)
         g, b = torch.chunk(cond, 2, dim=-1)
         g = g.permute(0, 2, 1)
@@ -124,6 +123,7 @@ class TCNModule(pl.LightningModule):
         self.save_hyperparameters()
 
         self.loss_function = LossFunction()
+        self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
 
         self.l1 = torch.nn.L1Loss()
         self.esr = auraloss.time.ESRLoss()
@@ -160,6 +160,12 @@ class TCNModule(pl.LightningModule):
         self.reduce_output = torch.nn.Conv1d(out_ch, 1, kernel_size=1)
         self.final_activation = torch.nn.Tanh()
 
+        receptive_field = self.compute_receptive_field()
+        self.guess_parameters = torch.nn.Sequential(
+            torch.nn.Flatten(),
+            torch.nn.Linear(receptive_field, 3),
+        )
+
     def forward(self, x, p):
         p = self.expand_parameters(p)
         for index, tcn_block in enumerate(self.tcn_blocks):
@@ -173,7 +179,8 @@ class TCNModule(pl.LightningModule):
                     skips = center_crop(skips, x.shape[-1]) + x
         x = self.reduce_output(x + skips)
         x = self.final_activation(x)
-        return x
+        q = self.guess_parameters(p)
+        return (x, q)
 
     def compute_receptive_field(self):
         """Compute the receptive field in samples."""
@@ -188,7 +195,7 @@ class TCNModule(pl.LightningModule):
     def training_step(self, batch, *_):
         input_signal, target_signal, parameters = batch
 
-        predicted_signal = self(input_signal, parameters)
+        predicted_signal, parameter_scores = self(input_signal, parameters)
 
         if self.hparams.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
@@ -197,11 +204,24 @@ class TCNModule(pl.LightningModule):
             input_signal = center_crop(input_signal, predicted_signal.shape[-1])
             target_signal = center_crop(target_signal, predicted_signal.shape[-1])
 
-        loss = self.loss_function(predicted_signal, target_signal)
+        parameter_labels = parameters.argmax(dim=-1)
+
+        audio_loss = self.loss_function(predicted_signal, target_signal)
+        parameter_loss = self.cross_entropy_loss(parameter_scores, parameter_labels)
+        total_loss = audio_loss + parameter_loss
 
         self.log(
-            "train_loss",
-            loss,
+            "train_loss/audio",
+            audio_loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+        self.log(
+            "train_loss/parameter",
+            parameter_loss,
             on_step=True,
             on_epoch=True,
             prog_bar=True,
@@ -209,11 +229,21 @@ class TCNModule(pl.LightningModule):
             sync_dist=True,
         )
 
-        return loss
+        self.log(
+            "train_loss",
+            total_loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+            sync_dist=True,
+        )
+
+        return total_loss
 
     def validation_step(self, batch, *_):
         input_signal, target_signal, parameters = batch
-        predicted_signal = self(input_signal, parameters)
+        predicted_signal, predicted_parameters = self(input_signal, parameters)
 
         if self.hparams.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])

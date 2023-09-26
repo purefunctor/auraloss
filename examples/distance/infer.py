@@ -22,13 +22,17 @@ with sf.SoundFile("data/day1_unsilenced/414_far_far_far_65_1192.wav", "r") as f:
     target_audio = f.read(44100 * 10 + receptive_field, dtype="float32", always_2d=True)
     target_audio = torch.tensor(target_audio.T).unsqueeze(0)
 
-for (p, n) in [(0.0, "close"), (0.25, "bad"), (0.5, "mid"), (1.0, "far")]:
+for p, n in [(0.0, "close"), (0.25, "bad"), (0.5, "mid"), (1.0, "far")]:
     p = torch.tensor([[[p]]])
     y = model(input_audio, p).squeeze().detach().numpy()
     sf.write(f"414_pred_{n}.wav", y, samplerate=44100)
 
-sf.write("414_near.wav", input_audio.squeeze().numpy()[receptive_field:], samplerate=44100)
-sf.write("414_far.wav", target_audio.squeeze().numpy()[receptive_field:], samplerate=44100)
+sf.write(
+    "414_near.wav", input_audio.squeeze().numpy()[receptive_field:], samplerate=44100
+)
+sf.write(
+    "414_far.wav", target_audio.squeeze().numpy()[receptive_field:], samplerate=44100
+)
 
 # artifacts = [
 #     ("TCN-100", "meeshkan/near-to-far/model-o4p6cz29:v19"),
