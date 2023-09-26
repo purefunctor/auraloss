@@ -240,6 +240,7 @@ class DistanceAugmentDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    i = DistanceAugmentDataset(DAY_1_FOLDER, {"67": "269"})
+    d = DistanceAugmentDataset(DAY_1_FOLDER, {"67": "269"}, chunk_size=44100 * 100, stride_factor=1)
+    for i in range(len(d)):
+        print(d[i][2])
 
-    print(i[0])
