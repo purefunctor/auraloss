@@ -242,7 +242,7 @@ class TCNModule(pl.LightningModule):
 
     def validation_step(self, batch, *_):
         input_signal, target_signal, parameters = batch
-        predicted_signal, predicted_parameters = self(input_signal, parameters)
+        predicted_signal, parameter_scores = self(input_signal, parameters)
 
         if self.hparams.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
@@ -251,6 +251,8 @@ class TCNModule(pl.LightningModule):
             input_signal = center_crop(input_signal, predicted_signal.shape[-1])
             target_signal = center_crop(target_signal, predicted_signal.shape[-1])
 
+        parameter_labels = parameters.argmax(dim=-1).squeeze()
+
         l1_loss = self.l1(predicted_signal, target_signal)
         esr_loss = self.esr(predicted_signal, target_signal)
         dc_loss = self.dc(predicted_signal, target_signal)
@@ -258,6 +260,7 @@ class TCNModule(pl.LightningModule):
         sisdr_loss = self.sisdr(predicted_signal, target_signal)
         stft_loss = self.stft(predicted_signal, target_signal)
         mrstft_loss = self.mrstft(predicted_signal, target_signal)
+        parameter_loss = self.cross_entropy_loss(parameter_scores, parameter_labels)
 
         aggregate_loss = (
             l1_loss
@@ -267,6 +270,7 @@ class TCNModule(pl.LightningModule):
             + sisdr_loss
             + mrstft_loss
             + stft_loss
+            + parameter_loss
         )
 
         self.log("val_loss", aggregate_loss, sync_dist=True)
@@ -277,6 +281,7 @@ class TCNModule(pl.LightningModule):
         self.log("val_loss/SI-SDR", sisdr_loss, sync_dist=True)
         self.log("val_loss/STFT", stft_loss, sync_dist=True)
         self.log("val_loss/MRSTFT", mrstft_loss, sync_dist=True)
+        self.log("val_loss/parameter", parameter_loss, sync_dist=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr)
