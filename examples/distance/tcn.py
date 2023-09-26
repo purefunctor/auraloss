@@ -186,9 +186,9 @@ class TCNModule(pl.LightningModule):
         return receptive_field
 
     def training_step(self, batch, *_):
-        input_signal, target_signal = batch
+        input_signal, target_signal, parameters = batch
 
-        predicted_signal = self(input_signal)
+        predicted_signal = self(input_signal, parameters)
 
         if self.hparams.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
@@ -212,8 +212,8 @@ class TCNModule(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, *_):
-        input_signal, target_signal = batch
-        predicted_signal = self(input_signal)
+        input_signal, target_signal, parameters = batch
+        predicted_signal = self(input_signal, parameters)
 
         if self.hparams.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
