@@ -1,4 +1,4 @@
-from data import DAY_1_FOLDER, DAY_2_FOLDER, EnhancementDataset
+from data import DAY_1_FOLDER, DAY_2_FOLDER, EnhancementDataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers.wandb import WandbLogger
@@ -67,7 +67,7 @@ configuration = {
 
 for n, p in configuration.items():
     model = TCNModule(**p)
-    datamodule = EnhancementDataset(
+    datamodule = EnhancementDataModule(
         DAY_1_FOLDER,
         DAY_2_FOLDER,
         chunk_size=32768,

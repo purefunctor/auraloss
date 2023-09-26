@@ -2,9 +2,10 @@ from collections import defaultdict
 from pathlib import Path
 import pytorch_lightning as pl
 import re
+from pytorch_lightning.utilities.types import EVAL_DATALOADERS
 import soundfile as sf
 import torch
-from torch.utils.data import ConcatDataset, Dataset, DataLoader
+from torch.utils.data import ConcatDataset, Dataset, DataLoader, random_split
 
 DAY_1_FOLDER = Path("./data/day1_unsilenced")
 DAY_2_FOLDER = Path("./data/day2_unsilenced")
@@ -118,3 +119,55 @@ class EnhancementDataset(Dataset):
     
     def __len__(self):
         return len(self.input_target_datasets)
+
+
+class EnhancementDataModule(pl.LightningDataModule):
+    def __init__(
+        self,
+        day_1_path: Path,
+        day_2_path: Path,
+        *,
+        near_is_input: bool = True,
+        chunk_size: int = 2048,
+        stride_factor: int = 2,
+        half: bool = False,
+        shuffle: bool = True,
+        batch_size: int = 64,
+        num_workers: int = 0,
+    ):
+        super().__init__()
+        self.day_1_path = day_1_path
+        self.day_2_path = day_2_path
+        self.near_is_input = near_is_input
+        self.chunk_size = chunk_size
+        self.stride_factor = stride_factor
+        self.half = half
+
+        self.shuffle = shuffle
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+    def setup(self, stage: str):
+        dataset = ConcatDataset([
+            EnhancementDataset(files, {"nt1": "67"}) for files in [self.day_1_path, self.day_2_path]
+        ])
+
+        training_dataset, validation_dataset = random_split(dataset, [0.8, 0.2])
+
+        self.training_dataset = training_dataset
+        self.validation_dataset = validation_dataset
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.training_dataset,
+            shuffle=self.shuffle,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.validation_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers
+        )        
