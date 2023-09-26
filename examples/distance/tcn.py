@@ -15,6 +15,26 @@ def causal_crop(x, length: int):
     return x[..., start:stop]
 
 
+class FiLM(torch.nn.Module):
+    def __init__(self, num_features, cond_dim):
+        super(FiLM, self).__init__()
+        self.num_features = num_features
+        self.bn = torch.nn.BatchNorm1d(num_features, affine=False)
+        self.adaptor = torch.nn.Linear(cond_dim, num_features * 2)
+
+    def forward(self, x, cond):
+
+        cond = self.adaptor(cond)
+        g, b = torch.chunk(cond, 2, dim=-1)
+        g = g.permute(0, 2, 1)
+        b = b.permute(0, 2, 1)
+
+        x = self.bn(x)  # apply BatchNorm without affine
+        x = (x * g) + b  # then apply conditional affine
+
+        return x
+
+
 class TCNBlock(torch.nn.Module):
     def __init__(
         self,
@@ -50,18 +70,20 @@ class TCNBlock(torch.nn.Module):
         # if depthwise:
         #     self.conv1b = torch.nn.Conv1d(out_ch, out_ch, kernel_size=1)
 
-        self.bn = torch.nn.BatchNorm1d(out_ch)
+        self.film = FiLM(out_ch, 128)
+        # self.bn = torch.nn.BatchNorm1d(out_ch)
 
         self.relu = torch.nn.PReLU(out_ch)
         self.res = torch.nn.Conv1d(
             in_ch, out_ch, kernel_size=1, groups=in_ch, bias=False
         )
 
-    def forward(self, x):
+    def forward(self, x, p):
         x_in = x
 
         x = self.conv1(x)
-        x = self.bn(x)
+        x = self.film(x, p)
+        # x = self.bn(x)
         x = self.relu(x)
 
         x_res = self.res(x_in)
@@ -89,6 +111,7 @@ class TCNModule(pl.LightningModule):
 
     def __init__(
         self,
+        nparams: int = 1,
         nblocks: int = 10,
         kernel_size: int = 3,
         dilation_growth: int = 1,
@@ -110,6 +133,15 @@ class TCNModule(pl.LightningModule):
         self.stft = auraloss.freq.STFTLoss()
         self.mrstft = auraloss.freq.MultiResolutionSTFTLoss()
 
+        self.expand_parameters = torch.nn.Sequential(
+            torch.nn.Linear(nparams, 32),
+            torch.nn.PReLU(),
+            torch.nn.Linear(32, 64),
+            torch.nn.PReLU(),
+            torch.nn.Linear(64, 128),
+            torch.nn.PReLU(),
+        )
+
         self.tcn_blocks = torch.nn.ModuleList()
         for n in range(nblocks):
             in_ch = channel_width if n > 0 else 1
@@ -128,9 +160,10 @@ class TCNModule(pl.LightningModule):
         self.reduce_output = torch.nn.Conv1d(out_ch, 1, kernel_size=1)
         self.final_activation = torch.nn.Tanh()
 
-    def forward(self, x):
+    def forward(self, x, p):
+        p = self.expand_parameters(p)
         for index, tcn_block in enumerate(self.tcn_blocks):
-            x = tcn_block(x)
+            x = tcn_block(x, p)
             if index == 0:
                 skips = x
             else:

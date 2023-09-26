@@ -37,7 +37,7 @@ from torch.utils.data import ConcatDataset, Dataset, DataLoader
 
 DAY_1_FOLDER = Path("./data/day1_unsilenced")
 DAY_2_FOLDER = Path("./data/day2_unsilenced")
-FILE_PATTERN = re.compile(r"^(\w+)_(\w+)_\w+_\w+_\d+_(\d+).wav$")
+FILE_PATTERN = re.compile(r"^(\w+)_(\w+)_(\w+)_\w+_\d+_(\d+).wav$")
 
 
 class InputTargetDataset(Dataset):
@@ -45,6 +45,7 @@ class InputTargetDataset(Dataset):
         self,
         input_file: Path,
         target_file: Path,
+        singer_position: str,
         *,
         chunk_size: int = 2048,
         stride_factor: int = 2,
@@ -52,6 +53,7 @@ class InputTargetDataset(Dataset):
     ):
         self.input_file = input_file
         self.target_file = target_file
+        self.singer_position = singer_position
         self.chunk_size = chunk_size
         self.stride_factor = stride_factor
         self.stride_length = chunk_size // stride_factor
@@ -84,7 +86,17 @@ class InputTargetDataset(Dataset):
             input_audio = input_audio.half()
             target_audio = target_audio.half()
 
-        return (input_audio, target_audio)
+        match self.singer_position:
+            case "close":
+                position_parameter = torch.tensor([[0.0]])
+            case "mid":
+                position_parameter = torch.tensor([[0.5]])
+            case "far":
+                position_parameter = torch.tensor([[1.0]])
+            case _:
+                raise Exception("Failed to parse singer position.")
+
+        return (input_audio, target_audio, position_parameter)
 
     def __len__(self):
         with sf.SoundFile(self.input_file, "r") as f:
@@ -118,13 +130,13 @@ class DistanceAugmentDataset(Dataset):
             match = FILE_PATTERN.match(file.name)
             if match is None:
                 continue
-            (microphone, near_or_far, offset) = match.groups()
-            files_per_microphone[(microphone, near_or_far)].append((file, offset))
+            (microphone, near_or_far, position, offset) = match.groups()
+            files_per_microphone[(microphone, near_or_far)].append((file, position, offset))
 
         for microphone_files in files_per_microphone.values():
-            microphone_files.sort(key=lambda x: int(x[1]))  # offset
+            microphone_files.sort(key=lambda x: int(x[2]))  # offset
             for i in range(len(microphone_files)):
-                microphone_files[i] = microphone_files[i][0]  # name
+                microphone_files[i] = (microphone_files[i][0], microphone_files[i][1])  # name, position
 
         input_target_datasets = []
         for near_microphone, far_microphone in pairs.items():
@@ -136,11 +148,13 @@ class DistanceAugmentDataset(Dataset):
             else:
                 target_files, input_files = near_files, far_files
 
-            for input_file, target_file in zip(input_files, target_files):
+            for (input_file, input_position), (target_file, target_position) in zip(input_files, target_files):
+                assert input_position == target_position
                 input_target_datasets.append(
                     InputTargetDataset(
                         input_file,
                         target_file,
+                        input_position,
                         chunk_size=self.chunk_size,
                         stride_factor=self.stride_factor,
                         half=self.half,
@@ -223,3 +237,9 @@ class DistanceAugmentDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
         )
+
+
+if __name__ == "__main__":
+    i = DistanceAugmentDataset(DAY_1_FOLDER, {"67": "269"})
+
+    print(i[0])

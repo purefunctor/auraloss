@@ -23,30 +23,30 @@ configuration = {
     #     "channel_width": 32,
     #     "lr": 0.001,
     # },
-    "uTCN-300-C": {
-        "nblocks": 4,
-        "dilation_growth": 10,
-        "kernel_size": 13,
-        "channel_width": 32,
-        "causal": True,
-        "lr": 0.001,
-    },
-    "uTCN-100-Cx3": {
-        "nblocks": 4,
-        "dilation_growth": 10,
-        "kernel_size": 5,
-        "channel_width": 96,
-        "causal": True,
-        "lr": 0.001,
-    },
-    "uTCN-300-Cx3": {
-        "nblocks": 4,
-        "dilation_growth": 10,
-        "kernel_size": 13,
-        "channel_width": 96,
-        "causal": True,
-        "lr": 0.001,
-    },
+    # "uTCN-300-C": {
+    #     "nblocks": 4,
+    #     "dilation_growth": 10,
+    #     "kernel_size": 13,
+    #     "channel_width": 32,
+    #     "causal": True,
+    #     "lr": 0.001,
+    # },
+    # "uTCN-100-Cx3": {
+    #     "nblocks": 4,
+    #     "dilation_growth": 10,
+    #     "kernel_size": 5,
+    #     "channel_width": 96,
+    #     "causal": True,
+    #     "lr": 0.001,
+    # },
+    # "uTCN-300-Cx3": {
+    #     "nblocks": 4,
+    #     "dilation_growth": 10,
+    #     "kernel_size": 13,
+    #     "channel_width": 96,
+    #     "causal": True,
+    #     "lr": 0.001,
+    # },
     # "TCN-324-C": {
     #     "nblocks": 10,
     #     "dilation_growth": 2,
@@ -55,10 +55,19 @@ configuration = {
     #     "causal": True,
     #     "lr": 0.001,
     # },
+    "TCN-324-C-FiLM": {
+        "nparams": 1,
+        "dilation_growth": 2,
+        "kernel_size": 15,
+        "channel_width": 32,
+        "causal": True,
+        "lr": 0.001,
+    }
 }
 
 for n, p in configuration.items():
     model = TCNModule(**p)
+
     datamodule = DistanceAugmentDataModule(
         DAY_1_FOLDER,
         DAY_2_FOLDER,
@@ -69,7 +78,7 @@ for n, p in configuration.items():
         near_is_input=True,
     )
 
-    wandb_logger = WandbLogger(project="near-to-far", name=f"{n}-128b", log_model="all")
+    wandb_logger = WandbLogger(project="near-to-far", name=f"{n}", log_model="all")
     wandb_logger.experiment.config.update({
         "receptive_field": model.compute_receptive_field(),
         "batch_size": datamodule.batch_size,
