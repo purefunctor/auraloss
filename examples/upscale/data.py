@@ -108,7 +108,7 @@ class EnhancementDataset(Dataset):
                         target_file,
                         chunk_size=self.chunk_size,
                         stride_factor=self.stride_factor,
-                        half=self.half
+                        half=self.half,
                     )
                 )
 
@@ -116,7 +116,7 @@ class EnhancementDataset(Dataset):
 
     def __getitem__(self, index):
         return self.input_target_datasets[index]
-    
+
     def __len__(self):
         return len(self.input_target_datasets)
 
@@ -127,7 +127,6 @@ class EnhancementDataModule(pl.LightningDataModule):
         day_1_path: Path,
         day_2_path: Path,
         *,
-        near_is_input: bool = True,
         chunk_size: int = 2048,
         stride_factor: int = 2,
         half: bool = False,
@@ -138,7 +137,6 @@ class EnhancementDataModule(pl.LightningDataModule):
         super().__init__()
         self.day_1_path = day_1_path
         self.day_2_path = day_2_path
-        self.near_is_input = near_is_input
         self.chunk_size = chunk_size
         self.stride_factor = stride_factor
         self.half = half
@@ -148,9 +146,18 @@ class EnhancementDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
 
     def setup(self, stage: str):
-        dataset = ConcatDataset([
-            EnhancementDataset(files, {"nt1": "67"}) for files in [self.day_1_path, self.day_2_path]
-        ])
+        dataset = ConcatDataset(
+            [
+                EnhancementDataset(
+                    files,
+                    {"nt1": "67"},
+                    chunk_size=self.chunk_size,
+                    stride_factor=self.stride_factor,
+                    half=self.half,
+                )
+                for files in [self.day_1_path, self.day_2_path]
+            ]
+        )
 
         training_dataset, validation_dataset = random_split(dataset, [0.8, 0.2])
 
@@ -162,12 +169,12 @@ class EnhancementDataModule(pl.LightningDataModule):
             self.training_dataset,
             shuffle=self.shuffle,
             batch_size=self.batch_size,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
         return DataLoader(
             self.validation_dataset,
             batch_size=self.batch_size,
-            num_workers=self.num_workers
-        )        
+            num_workers=self.num_workers,
+        )

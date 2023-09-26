@@ -74,7 +74,6 @@ for n, p in configuration.items():
         num_workers=16,
         half=half,
         batch_size=128,
-        near_is_input=True,
     )
 
     wandb_logger = WandbLogger(project="enhancement", name=f"{n}", log_model="all")
