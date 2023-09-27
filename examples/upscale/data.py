@@ -158,6 +158,9 @@ class EnhancementDataModule(pl.LightningDataModule):
                 for files in [self.day_1_path, self.day_2_path]
             ]
         )
+        training_dataset, validation_dataset = torch.utils.data.random_split(
+            dataset, [0.8, 0.2]
+        )
 
         training_dataset, validation_dataset = random_split(dataset, [0.8, 0.2])
 
