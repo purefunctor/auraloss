@@ -15,6 +15,17 @@ def causal_crop(x, length: int):
     return x[..., start:stop]
 
 
+def find_cutoff(energy: torch.Tensor, threshold: float):
+    threshold = energy[-1] * torch.tensor(threshold)
+    return (energy < threshold).to(torch.int16).neg().argmax()
+
+
+def get_cutoff_index(stft_x: torch.Tensor):
+    abs_stft_x = torch.abs(stft_x)
+    energy = torch.cumsum(torch.sum(abs_stft_x, axis=-1), axis=-1)
+    return find_cutoff(energy, 0.97)
+
+
 class TCNBlock(torch.nn.Module):
     def __init__(
         self,
@@ -100,7 +111,9 @@ class TCNModule(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.loss_function = LossFunction()
+        self.loss_function = torch.nn.MSELoss()
+
+        self.hann_window = torch.hann_window(2048)
 
         self.l1 = torch.nn.L1Loss()
         self.esr = auraloss.time.ESRLoss()
@@ -164,7 +177,27 @@ class TCNModule(pl.LightningModule):
             input_signal = center_crop(input_signal, predicted_signal.shape[-1])
             target_signal = center_crop(target_signal, predicted_signal.shape[-1])
 
-        loss = self.loss_function(predicted_signal, target_signal)
+        predicted_stft = torch.stft(
+            predicted_signal.squeeze(1),
+            n_fft=2048,
+            window=torch.hann_window(2048).to(self.device),
+            pad_mode="constant",
+            return_complex=True,
+        )
+        target_stft = torch.stft(
+            target_signal.squeeze(1),
+            n_fft=2048,
+            window=torch.hann_window(2048).to(self.device),
+            pad_mode="constant",
+            return_complex=True,
+        )
+
+        cutoff_index = get_cutoff_index(target_stft)
+        predicted_stft[:cutoff_index] = target_stft[:cutoff_index]
+
+        loss = self.loss_function(
+            torch.view_as_real(predicted_stft), torch.view_as_real(target_stft)
+        )
 
         self.log(
             "train_loss",
