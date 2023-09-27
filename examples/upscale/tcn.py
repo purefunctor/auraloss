@@ -9,6 +9,17 @@ def center_crop(x, shape):
     return x[..., start:stop]
 
 
+def find_cutoff(energy: torch.Tensor, threshold: float):
+    threshold = energy[-1] * torch.tensor(threshold)
+    return (energy < threshold).to(torch.int16).neg().argmax()
+
+
+def get_cutoff_index(stft_x: torch.Tensor):
+    abs_stft_x = torch.abs(stft_x)
+    energy = torch.cumsum(torch.sum(abs_stft_x, axis=-1), axis=-1)
+    return find_cutoff(energy, 0.97)
+
+
 class FiLM(torch.nn.Module):
     def __init__(self, num_features, cond_dim):
         super().__init__()
@@ -113,7 +124,8 @@ class TCNModule(pl.LightningModule):
         if nparams == 0:
             raise ValueError("Must have at least one conditioning parameter.")
 
-        self.loss_function = LossFunction()
+        self.hann_window = torch.hann_window(2048)
+        self.loss_function = torch.nn.MSELoss()
 
         self.l1 = torch.nn.L1Loss()
         self.esr = auraloss.time.ESRLoss()
@@ -163,7 +175,27 @@ class TCNModule(pl.LightningModule):
         input_signal = center_crop(input_signal, predicted_signal.shape)
         target_signal = center_crop(target_signal, predicted_signal.shape)
 
-        loss = self.loss_function(predicted_signal, target_signal)
+        predicted_stft = torch.stft(
+            predicted_signal.squeeze(1),
+            n_fft=2048,
+            window=self.hann_window.to(self.device),
+            pad_mode="constant",
+            return_complex=True,
+        )
+        target_stft = torch.stft(
+            target_signal.squeeze(1),
+            n_fft=2048,
+            window=self.hann_window.to(self.device),
+            pad_mode="constant",
+            return_complex=True,
+        )
+
+        cutoff_index = get_cutoff_index(target_stft)
+        predicted_stft[:cutoff_index] = target_stft[:cutoff_index]
+
+        loss = self.loss_function(
+            torch.view_as_real(predicted_stft), torch.view_as_real(target_stft)
+        )
 
         self.log(
             "train_loss",
@@ -243,11 +275,11 @@ if __name__ == "__main__":
         precision = "16-mixed"
     else:
         precision = "32-true"
-    CHUNK_LENGTH=32768
+    CHUNK_LENGTH = 32768
     model = TCNModule(kernel_size=15, channel_width=32, dilation_growth=2, lr=0.001)
     datamodule = MicroChangeDataModule(
         chunk_length=CHUNK_LENGTH,
-        stride_length=CHUNK_LENGTH//4,
+        stride_length=CHUNK_LENGTH // 4,
         num_workers=8,
         half=half,
         batch_size=128,
@@ -255,7 +287,12 @@ if __name__ == "__main__":
 
     wandb_logger = WandbLogger(project="nt1-to-u67-auraloss", log_model="all")
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
-    trainer = Trainer(max_epochs=20, callbacks=[model_checkpoint], precision=precision, logger=wandb_logger)
+    trainer = Trainer(
+        max_epochs=20,
+        callbacks=[model_checkpoint],
+        precision=precision,
+        logger=wandb_logger,
+    )
     trainer.fit(
         model,
         datamodule=datamodule,

@@ -41,7 +41,7 @@ class RecordingDataset(Dataset):
         )
 
     def __len__(self) -> int:
-        return ((self.num_frames - self.chunk_length) // self.stride_length)
+        return (self.num_frames - self.chunk_length) // self.stride_length
 
 
 class MicroChangeDataModule(pl.LightningDataModule):
@@ -65,7 +65,11 @@ class MicroChangeDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         datasets = [
-            RecordingDataset(chunk_length=self.chunk_length, stride_length=self.stride_length, half=self.half)
+            RecordingDataset(
+                chunk_length=self.chunk_length,
+                stride_length=self.stride_length,
+                half=self.half,
+            )
         ]
         dataset = ConcatDataset(datasets)
         training_dataset, validation_dataset = torch.utils.data.random_split(
