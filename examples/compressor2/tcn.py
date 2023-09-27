@@ -186,6 +186,16 @@ class TCNModel(pl.LightningModule):
 
         return torch.tanh(self.output(x + skips))
 
+    def compute_receptive_field(self):
+        """Compute the receptive field in samples."""
+        receptive_field = self.hparams.kernel_size
+        for index in range(1, self.hparams.nblocks):
+            dilation = self.hparams.dilation_growth ** (index % self.hparams.stack_size)
+            receptive_field = receptive_field + (
+                (self.hparams.kernel_size - 1) * dilation
+            )
+        return receptive_field
+
     def training_step(self, batch, batch_idx):
         input, target, params = batch
 

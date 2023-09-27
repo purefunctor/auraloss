@@ -1,8 +1,11 @@
 from data import CompressorDataModule
 from tcn import TCNModel
+import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers.wandb import WandbLogger
+
+torch.set_float32_matmul_precision("high")
 
 half = True
 

@@ -1,36 +1,40 @@
-import librosa
 import soundfile as sf
+from data import Eleven78, eleven78_to_0_1, attack_to_0_1, release_to_0_1
 from tcn import TCNModel
 import torch
+import wandb
 
-# FILENAME = "o_x_MX20.TWO.wav"
-# FRAME_LENGTH = 2048
-# HOP_LENGTH = 512
-# NUM_SECONDS_OF_SLICE = 2
+api = wandb.Api()
 
-# sound, sr = librosa.load(FILENAME, sr=None)
+artifact = api.artifact("meeshkan/eleven78-compressor-unsilenced/model-yeasc3a8:v39")
+weights = artifact.get_path("model.ckpt").download("/tmp/")
+model = TCNModel.load_from_checkpoint(weights).eval()
 
-# clip_rms = librosa.feature.rms(
-#     y=sound, frame_length=FRAME_LENGTH, hop_length=HOP_LENGTH
-# )
+peak_index = 32165376
 
-# clip_rms = clip_rms.squeeze()
-# peak_rms_index = clip_rms.argmax()
-# peak_index = peak_rms_index * HOP_LENGTH + int(FRAME_LENGTH / 2)
+input_file = "67_near_day1_ratio4_attack7_release5_Aku_542232920_579457368.wav"
+target_file = "67_1178_2_day1_ratio4_attack7_release5_Aku_542232920_579457368.wav"
 
-peak_index = 578278400
+with sf.SoundFile(input_file, "r") as f:
+    f.seek(peak_index - 44100 * 5)
+    input_audio = f.read(44100 * 10, dtype="float32", always_2d=True)
+    sf.write("input.wav", input_audio, 44100)
 
-model = TCNModel.load_from_checkpoint("lightning_logs/version_4/checkpoints/epoch=11-step=7008.ckpt").eval().cuda().half()
+with sf.SoundFile(target_file, "r") as f:
+    f.seek(peak_index - 44100 * 5)
+    target_audio = f.read(44100 * 10, dtype="float32", always_2d=True)
+    sf.write("target.wav", target_audio, 44100)
 
-input_sound, _ = librosa.load("o_x_MX20.TWO.wav", sr=44100, offset=peak_index // 44100 - 3, duration=10)
-sf.write("input.wav", input_sound, samplerate=44100)
+input_audio = torch.tensor(input_audio.T).reshape(1, 1, -1).cuda()
+target_audio = torch.tensor(target_audio.T).reshape(1, 1, -1).cuda()
 
-target_sound, _ = librosa.load("o_y_MX20.TWO.wav", sr=44100, offset=peak_index // 44100 - 3, duration=10)
-sf.write("target.wav", target_sound, samplerate=44100)
+for c in [Eleven78.FOUR, Eleven78.EIGHT, Eleven78.TWELVE]:
+    parameters = torch.tensor([[[
+        eleven78_to_0_1(c),
+        attack_to_0_1(7),
+        release_to_0_1(5),
+    ]]]).cuda()
 
-input_sound = torch.tensor(input_sound).cuda().half().unsqueeze(0).unsqueeze(0)
-parameters = torch.tensor([1.0, 0.2]).cuda().half().unsqueeze(0).unsqueeze(0)
-predicted_sound = model(input_sound, parameters)
+    predicted_audio = model(input_audio, parameters)
 
-predicted_sound = predicted_sound.float().squeeze().detach().cpu().numpy()
-sf.write("prediction.wav", predicted_sound, samplerate=44100)
+    sf.write(f"predicted_{c}.wav", predicted_audio.squeeze().detach().cpu().numpy(), 44100)

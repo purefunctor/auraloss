@@ -47,7 +47,7 @@ MINATTACK = min([x[1] for x in INDEXED])
 MAXATTACK = max([x[1] for x in INDEXED])
 MINRELEASE = min([x[2] for x in INDEXED])
 MAXRELEASE = max([x[2] for x in INDEXED])
-INDEXEDG = groupby(INDEXED, key=lambda item: (item[3], item[4], item[5]))
+INDEXEDG = [list(x) for _, x in groupby(INDEXED, key=lambda item: (item[3], item[4], item[5]))]
 
 def eleven78_to_0_1(eleven78):
     return 0 if eleven78 == Eleven78.FOUR else 0.5 if eleven78 == Eleven78.EIGHT else 1
@@ -83,8 +83,14 @@ class RecordingDataset(Dataset):
 
     def __getitem__(self, marker: int):
             frame_index = self.stride_length * marker
-            input_audio, _ = torchaudio.load(self.filenamei, frame_offset=frame_index,num_frames=self.chunk_length)
-            target_audio, _ = torchaudio.load(self.filenameo, frame_offset=frame_index,num_frames=self.chunk_length)
+            with sf.SoundFile(self.filenamei, "r") as f:
+                f.seek(frame_index)
+                input_audio = f.read(frames=self.chunk_length, dtype="float32", always_2d=True, fill_value=0.0)
+                input_audio = torch.tensor(input_audio.T)
+            with sf.SoundFile(self.filenameo, "r") as f:
+                f.seek(frame_index)
+                target_audio = f.read(frames=self.chunk_length, dtype="float32", always_2d=True, fill_value=0.0)
+                target_audio = torch.tensor(target_audio.T)
             parameters = torch.tensor([[eleven78_to_0_1(self.eleven78), attack_to_0_1(self.attack), release_to_0_1(self.release)]])
             
             if self.half:
@@ -154,4 +160,4 @@ class CompressorDataModule(pl.LightningDataModule):
 if __name__ == '__main__':
     import subprocess
     for FI in INDEXED:
-        subprocess.call(f'aws s3 cp s3://meeshkan-datasets/compressor-1178/{FI} {FI}', shell=True)
+        subprocess.call(f'aws s3 cp s3://meeshkan-datasets/compressor-1178/{FI[-1]} {FI[-1]}', shell=True)
