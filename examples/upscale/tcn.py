@@ -112,7 +112,7 @@ class TCNModule(pl.LightningModule):
         self.save_hyperparameters()
 
         self.hann_window = torch.hann_window(2048)
-        self.loss_function = torch.nn.MSELoss()
+        self.loss_function = LossFunction()
 
         self.l1 = torch.nn.L1Loss()
         self.esr = auraloss.time.ESRLoss()
@@ -194,9 +194,10 @@ class TCNModule(pl.LightningModule):
         cutoff_index = get_cutoff_index(target_stft)
         predicted_stft[:cutoff_index] = target_stft[:cutoff_index]
 
-        loss = self.loss_function(
-            torch.view_as_real(predicted_stft), torch.view_as_real(target_stft)
-        )
+        predicted_istft = torch.istft(predicted_stft)
+        target_istft = torch.istft(target_stft)
+
+        loss = self.loss_function(predicted_istft, target_istft)
 
         self.log(
             "train_loss",

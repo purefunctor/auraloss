@@ -6,7 +6,7 @@ import wandb
 
 api = wandb.Api()
 
-artifact = api.artifact("meeshkan/enhancement/model-i9lviph4:v19")
+artifact = api.artifact("meeshkan/enhancement/model-u5bkiltr:v19")
 weights = artifact.get_path("model.ckpt").download("/tmp")
 model = TCNModule.load_from_checkpoint(weights, map_location=torch.device("cpu")).eval()
 receptive_field = model.compute_receptive_field()

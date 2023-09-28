@@ -76,7 +76,7 @@ for n, p in configuration.items():
         batch_size=128,
     )
 
-    wandb_logger = WandbLogger(project="enhancement", name=f"{n}-G", log_model="all")
+    wandb_logger = WandbLogger(project="enhancement", name=f"{n}-G-2", log_model="all")
     wandb_logger.experiment.config.update({
         "receptive_field": model.compute_receptive_field(),
         "batch_size": datamodule.batch_size,
