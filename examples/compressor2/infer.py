@@ -92,7 +92,7 @@ for index, ((input_file, target_file, ratio, attack, release), peak_index) in en
                 ln = f"releaseCanon{l}" if l == release else f"release{l}"
 
                 sf.write(
-                    f"sweep/predicted_{index}_{rn}_{an}_{release}.wav",
+                    f"sweep/predicted_{index}_{rn}_{an}_{ln}.wav",
                     predicted_audio.squeeze().detach().cpu().numpy(),
                     44100,
                 )
