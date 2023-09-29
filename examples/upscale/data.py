@@ -71,14 +71,16 @@ class EnhancementDataset(Dataset):
     def __init__(
         self,
         files: Path,
-        pairs: dict[str, str],
+        target: str,
+        exclude: str,
         *,
         chunk_size: int = 2048,
         stride_factor: int = 2,
         half: bool = False,
     ):
         self.files = files
-        self.pairs = pairs
+        self.target = target
+        self.exclude = exclude
         self.chunk_size = chunk_size
         self.stride_factor = stride_factor
         self.half = half
@@ -88,19 +90,20 @@ class EnhancementDataset(Dataset):
             match = FILE_PATTERN.match(file.name)
             if match is None:
                 continue
-            (microphone, _, offset) = match.groups()
-            files_per_microphone[microphone].append((file, offset))
+            (microphone, distance, offset) = match.groups()
+            files_per_microphone[f"{microphone}_{distance}"].append((file, offset))
 
         for microphone_files in files_per_microphone.values():
             microphone_files.sort(key=lambda x: int(x[1]))  # offset
             for i in range(len(microphone_files)):
                 microphone_files[i] = microphone_files[i][0]  # name
 
-        input_target_datasets = []
-        for input_microphone, target_microphone in pairs.items():
-            input_files = files_per_microphone[input_microphone]
-            target_files = files_per_microphone[target_microphone]
+        target_files = files_per_microphone.pop(target)
+        _ = files_per_microphone.pop(exclude)
 
+        input_target_datasets = []
+        for input_microphone in files_per_microphone.keys():
+            input_files = files_per_microphone[input_microphone]
             for input_file, target_file in zip(input_files, target_files):
                 input_target_datasets.append(
                     InputTargetDataset(
@@ -150,7 +153,8 @@ class EnhancementDataModule(pl.LightningDataModule):
             [
                 EnhancementDataset(
                     files,
-                    {"nt1": "67"},
+                    target="67_near",
+                    exclude="269_far",
                     chunk_size=self.chunk_size,
                     stride_factor=self.stride_factor,
                     half=self.half,

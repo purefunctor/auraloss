@@ -15,22 +15,22 @@ else:
     precision = "32-true"
 
 configuration = {
-    "uTCN-100-C": {
-        "nblocks": 4,
-        "dilation_growth": 10,
-        "kernel_size": 5,
-        "causal": True,
-        "channel_width": 32,
-        "lr": 0.001,
-    },
-    "uTCN-300-C": {
-        "nblocks": 4,
-        "dilation_growth": 10,
-        "kernel_size": 13,
-        "channel_width": 32,
-        "causal": True,
-        "lr": 0.001,
-    },
+    # "uTCN-100-C": {
+    #     "nblocks": 4,
+    #     "dilation_growth": 10,
+    #     "kernel_size": 5,
+    #     "causal": True,
+    #     "channel_width": 32,
+    #     "lr": 0.001,
+    # },
+    # "uTCN-300-C": {
+    #     "nblocks": 4,
+    #     "dilation_growth": 10,
+    #     "kernel_size": 13,
+    #     "channel_width": 32,
+    #     "causal": True,
+    #     "lr": 0.001,
+    # },
     # "uTCN-100-Cx3": {
     #     "nblocks": 4,
     #     "dilation_growth": 10,
@@ -76,7 +76,7 @@ for n, p in configuration.items():
         batch_size=128,
     )
 
-    wandb_logger = WandbLogger(project="enhancement", name=f"{n}-G-2", log_model="all")
+    wandb_logger = WandbLogger(project="enhancement", name=f"{n}-G-M", log_model="all")
     wandb_logger.experiment.config.update({
         "receptive_field": model.compute_receptive_field(),
         "batch_size": datamodule.batch_size,
