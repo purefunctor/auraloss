@@ -5,9 +5,20 @@ import torch
 from torch.utils.data import ConcatDataset, Dataset, DataLoader
 from itertools import groupby
 
-from control_data_experiment_1 import RAW_SAMPLES_DAY_1, CM1AAttack, CM1ARatio, CM1ARelease, RAW_SAMPLES_DAY_2, RAW_CM1A1_DAY_1, RAW_CM1A2_DAY_1, RAW_CM1A1_DAY_2, RAW_CM1A2_DAY_2
+from control_data_experiment_1 import (
+    RAW_SAMPLES_DAY_1,
+    CM1AAttack,
+    CM1ARatio,
+    CM1ARelease,
+    RAW_SAMPLES_DAY_2,
+    RAW_CM1A1_DAY_1,
+    RAW_CM1A2_DAY_1,
+    RAW_CM1A1_DAY_2,
+    RAW_CM1A2_DAY_2,
+)
 import subprocess
 import os
+
 CM1As = [
     [RAW_CM1A1_DAY_1, RAW_CM1A1_DAY_2, ["67_near.wav", "67_CM1A_1.wav"]],
     [RAW_CM1A2_DAY_1, RAW_CM1A2_DAY_2, ["67_near.wav", "67_CMA1_2.wav"]],
@@ -35,10 +46,6 @@ for WHICH_CM1A, GOODS in enumerate(CM1As):
         for day, (arr1, arr2) in enumerate(
             [(RAW_SAMPLES_DAY_1, GOODS[0]), (RAW_SAMPLES_DAY_2, GOODS[1])]
         ):
-            subprocess.call(
-                f"aws s3 cp s3://meeshkan-datasets/raw-audio/day{day+1}/{FI} {FI}",
-                shell=True,
-            )
             for n in range(len(arr1)):
                 if arr2[n][1] == None:
                     continue
@@ -51,18 +58,69 @@ for WHICH_CM1A, GOODS in enumerate(CM1As):
                     FI.split(".")[0]
                     + f"_day-{day+1}_cm1a-{WHICH_CM1A}_ratio-{RATIO}_attack-{ATTACK}_release-{RELEASE}_{NAME}_{arr1[n]}_{arr1[n+1]}.wav"
                 )
-            INDEXED.append((RATIO, ATTACK, RELEASE, day, WHICH_CM1A, arr1[n], arr1[n+1], INFI, OFI))
+                INDEXED.append(
+                    (
+                        RATIO,
+                        ATTACK,
+                        RELEASE,
+                        day,
+                        WHICH_CM1A,
+                        arr1[n],
+                        arr1[n + 1],
+                        INFI,
+                        OFI,
+                    )
+                )
 
-INDEXEDG = [list(x) for _, x in groupby(INDEXED, key=lambda item: (item[3], item[4], item[5], item[6]))]
+INDEXEDG = [
+    list(x)
+    for _, x in groupby(INDEXED, key=lambda item: (item[3], item[4], item[5], item[6]))
+]
 
-def eleven78_to_0_1(eleven78):
-    return (0 if eleven78 == CM1ARatio.TWO else 1 if eleven78 == CM1ARatio.THREE else 2 if eleven78 == CM1ARatio.FOUR else 3 if eleven78 == CM1ARatio.FIVE else 4 if eleven78 == CM1ARatio.SIX else 5) / 5
+
+def ratio_to_0_1(ratio):
+    return (
+        0
+        if ratio == CM1ARatio.TWO
+        else 1
+        if ratio == CM1ARatio.THREE
+        else 2
+        if ratio == CM1ARatio.FOUR
+        else 3
+        if ratio == CM1ARatio.FIVE
+        else 4
+        if ratio == CM1ARatio.SIX
+        else 5
+    ) / 5
+
 
 def attack_to_0_1(attack):
-    return (0 if attack == CM1AAttack.SLOW else 1 if attack == CM1AAttack.MEDIUM_SLOW else 2 if attack == CM1AAttack.MEDIUM else 3 if attack == CM1AAttack.MEDIUM_FAST else 4) / 4
+    return (
+        0
+        if attack == CM1AAttack.SLOW
+        else 1
+        if attack == CM1AAttack.MEDIUM_SLOW
+        else 2
+        if attack == CM1AAttack.MEDIUM
+        else 3
+        if attack == CM1AAttack.MEDIUM_FAST
+        else 4
+    ) / 4
+
 
 def release_to_0_1(release):
-    return (0 if release == CM1ARelease.SLOW else 1 if release == CM1ARelease.MEDIUM_SLOW else 2 if release == CM1ARelease.MEDIUM else 3 if release == CM1ARelease.MEDIUM_FAST else 4) / 4
+    return (
+        0
+        if release == CM1ARelease.SLOW
+        else 1
+        if release == CM1ARelease.MEDIUM_SLOW
+        else 2
+        if release == CM1ARelease.MEDIUM
+        else 3
+        if release == CM1ARelease.MEDIUM_FAST
+        else 4
+    ) / 4
+
 
 class RecordingDataset(Dataset):
     def __init__(
@@ -88,27 +146,46 @@ class RecordingDataset(Dataset):
         self.half = half
 
     def __getitem__(self, marker: int):
-            frame_index = self.stride_length * marker
-            with sf.SoundFile(self.filenamei, "r") as f:
-                f.seek(frame_index)
-                input_audio = f.read(frames=self.chunk_length, dtype="float32", always_2d=True, fill_value=0.0)
-                input_audio = torch.tensor(input_audio.T)
-            with sf.SoundFile(self.filenameo, "r") as f:
-                f.seek(frame_index)
-                target_audio = f.read(frames=self.chunk_length, dtype="float32", always_2d=True, fill_value=0.0)
-                target_audio = torch.tensor(target_audio.T)
-            parameters = torch.tensor([[eleven78_to_0_1(self.eleven78), attack_to_0_1(self.attack), release_to_0_1(self.release)]])
-            
-            if self.half:
-                input_audio = input_audio.half()
-                target_audio = target_audio.half()
-                parameters = parameters.half()
-
-            return (
-                input_audio,
-                target_audio,
-                parameters,
+        frame_index = self.stride_length * marker
+        with sf.SoundFile(self.filenamei, "r") as f:
+            f.seek(frame_index)
+            input_audio = f.read(
+                frames=self.chunk_length,
+                dtype="float32",
+                always_2d=True,
+                fill_value=0.0,
             )
+            input_audio = torch.tensor(input_audio.T)
+        with sf.SoundFile(self.filenameo, "r") as f:
+            f.seek(frame_index)
+            target_audio = f.read(
+                frames=self.chunk_length,
+                dtype="float32",
+                always_2d=True,
+                fill_value=0.0,
+            )
+            target_audio = torch.tensor(target_audio.T)
+        parameters = torch.tensor(
+            [
+                [
+                    ratio_to_0_1(self.eleven78),
+                    attack_to_0_1(self.attack),
+                    release_to_0_1(self.release),
+                ]
+            ]
+        )
+
+        if self.half:
+            input_audio = input_audio.half()
+            target_audio = target_audio.half()
+            parameters = parameters.half()
+
+        return (
+            input_audio,
+            target_audio,
+            parameters,
+        )
+
     def __len__(self) -> int:
         return (self.num_frames - self.chunk_length) // self.stride_length
 
@@ -133,13 +210,19 @@ class CompressorDataModule(pl.LightningDataModule):
         self.half = half
 
     def setup(self, stage: str):
+        print(stage)
         datasets = [
-            RecordingDataset(I[0][0],
-        I[0][1],
-        I[0][2],
-        I[0][7] if '67_near' in I[0][7] else I[1][7],
-        I[1][7] if '67_near' in I[0][7] else I[0][7], chunk_length=self.chunk_length, stride_length = self.stride_length, half=self.half)
-            for I in INDEXEDG 
+            RecordingDataset(
+                I[0][0],
+                I[0][1],
+                I[0][2],
+                I[0][7] if "67_near" in I[0][7] else I[1][7],
+                I[1][7] if "67_near" in I[0][7] else I[0][7],
+                chunk_length=self.chunk_length,
+                stride_length=self.stride_length,
+                half=self.half,
+            )
+            for I in INDEXEDG
         ]
         dataset = ConcatDataset(datasets)
         training_dataset, validation_dataset = torch.utils.data.random_split(
@@ -162,8 +245,3 @@ class CompressorDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
         )
-
-if __name__ == '__main__':
-    import subprocess
-    for FI in INDEXED:
-        subprocess.call(f'aws s3 cp s3://meeshkan-datasets/compressor-cm1a/{FI[-1]} {FI[-1]}', shell=True)

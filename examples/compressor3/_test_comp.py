@@ -51,7 +51,6 @@ results = {}
 losses = ["l1", "logcosh", "esr+dc", "stft", "mrstft", "rrstft"]
 
 for loss_model in losses:
-
     root_logdir = os.path.join(args.logdir, loss_model, "lightning_logs", "version_0")
 
     checkpoint_path = glob.glob(os.path.join(root_logdir, "checkpoints", "*"))[0]

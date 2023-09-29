@@ -65,7 +65,6 @@ class SignalTrainLA2ADataset(torch.utils.data.Dataset):
         for idx, (tfile, ifile, params) in enumerate(
             zip(self.target_files, self.input_files, self.params)
         ):
-
             ifile_id = int(os.path.basename(ifile).split("_")[1])
             tfile_id = int(os.path.basename(tfile).split("_")[1])
             if ifile_id != tfile_id:

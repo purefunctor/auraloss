@@ -5,6 +5,7 @@ import numpy as np
 frame_length = 1024
 hop_length = 512
 
+
 def get_silent_frames(infi):
     # Load the audio file
     y, sr = librosa.load(infi, sr=None)

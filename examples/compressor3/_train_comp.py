@@ -72,7 +72,6 @@ else:
     losses = [args.train_loss]
 
 for loss_fn in losses:
-
     print(f"training with {loss_fn}")
     # init logger
     logdir = os.path.join("lightning_logs", f"version_{version}", loss_fn)

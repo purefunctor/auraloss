@@ -9,16 +9,19 @@ class Position(Enum):
     MID = 2
     FAR = 3
 
+
 class MX20(Enum):
     TWO = 2
     FOUR = 4
     EIGHT = 8
     TWELVE = 12
 
+
 class Eleven78(Enum):
     FOUR = 4
     EIGHT = 8
     TWELVE = 12
+
 
 class CM1ARatio(Enum):
     TWO = 2
@@ -28,6 +31,7 @@ class CM1ARatio(Enum):
     SIX = 6
     EIGHT = 8
 
+
 class CM1AAttack(Enum):
     SLOW = 1
     MEDIUM_SLOW = 2
@@ -35,12 +39,14 @@ class CM1AAttack(Enum):
     MEDIUM_FAST = 4
     FAST = 5
 
+
 class CM1ARelease(Enum):
     SLOW = 1
     MEDIUM_SLOW = 2
     MEDIUM = 3
     MEDIUM_FAST = 4
     FAST = 5
+
 
 class Row(Enum):
     CLOSE = 1
@@ -209,8 +215,8 @@ RAW_COMPRESSOR_DAY_1 = annotate(
         (MX20.EIGHT, MX20.TWELVE),
         (MX20.EIGHT, MX20.TWELVE),
         "Mike",
-        (None, None), #??????
-        (None, None), #??????
+        (None, None),  # ??????
+        (None, None),  # ??????
     ]
 )
 RAW_1178_DAY_1 = annotate(
@@ -223,7 +229,7 @@ RAW_1178_DAY_1 = annotate(
         "Hanna",
         (Eleven78.FOUR, 7, 5),
         (Eleven78.EIGHT, 1, 1),
-        (Eleven78.TWELVE, 2, 5), ### PERHAPS NONE??
+        (Eleven78.TWELVE, 2, 5),  ### PERHAPS NONE??
         "Aku",
         (Eleven78.FOUR, 2, 7),
         (Eleven78.FOUR, 2, 7),
@@ -237,8 +243,8 @@ RAW_1178_DAY_1 = annotate(
         (Eleven78.EIGHT, 4, 7),
         (Eleven78.EIGHT, 4, 7),
         "Mike",
-        None, #??????
-        None, #??????
+        None,  # ??????
+        None,  # ??????
     ]
 )
 RAW_CM1A2_DAY_1 = annotate(
@@ -251,7 +257,7 @@ RAW_CM1A2_DAY_1 = annotate(
         "Hanna",
         (CM1ARatio.THREE, CM1AAttack.FAST, CM1ARelease.SLOW),
         (CM1ARatio.FIVE, CM1AAttack.MEDIUM_FAST, CM1ARelease.MEDIUM_SLOW),
-        (CM1ARatio.EIGHT, CM1AAttack.FAST, CM1ARelease.FAST), ### PERHAPS NONE??
+        (CM1ARatio.EIGHT, CM1AAttack.FAST, CM1ARelease.FAST),  ### PERHAPS NONE??
         "Aku",
         (CM1ARatio.THREE, CM1AAttack.FAST, CM1ARelease.FAST),
         (CM1ARatio.THREE, CM1AAttack.FAST, CM1ARelease.FAST),
@@ -265,8 +271,8 @@ RAW_CM1A2_DAY_1 = annotate(
         (CM1ARatio.THREE, CM1AAttack.MEDIUM, CM1ARelease.FAST),
         (CM1ARatio.THREE, CM1AAttack.MEDIUM, CM1ARelease.FAST),
         "Mike",
-        None, #??????
-        None, #??????
+        None,  # ??????
+        None,  # ??????
     ]
 )
 RAW_CM1A1_DAY_1 = annotate(
@@ -279,7 +285,7 @@ RAW_CM1A1_DAY_1 = annotate(
         "Hanna",
         (CM1ARatio.TWO, CM1AAttack.FAST, CM1ARelease.MEDIUM_SLOW),
         (CM1ARatio.FOUR, CM1AAttack.SLOW, CM1ARelease.MEDIUM_FAST),
-        (CM1ARatio.SIX, CM1AAttack.MEDIUM, CM1ARelease.MEDIUM), ### PERHAPS NONE??
+        (CM1ARatio.SIX, CM1AAttack.MEDIUM, CM1ARelease.MEDIUM),  ### PERHAPS NONE??
         "Aku",
         (CM1ARatio.TWO, CM1AAttack.MEDIUM_FAST, CM1ARelease.MEDIUM_FAST),
         (CM1ARatio.TWO, CM1AAttack.MEDIUM_FAST, CM1ARelease.MEDIUM_FAST),
@@ -293,17 +299,25 @@ RAW_CM1A1_DAY_1 = annotate(
         (CM1ARatio.TWO, CM1AAttack.MEDIUM_FAST, CM1ARelease.FAST),
         (CM1ARatio.TWO, CM1AAttack.MEDIUM_FAST, CM1ARelease.FAST),
         "Mike",
-        None, #??????
-        None, #??????
+        None,  # ??????
+        None,  # ??????
     ]
 )
+
+
 def cm1a_is_sane(i):
     for x in i:
         z = x[1]
-        if z == None: continue
-        if (not isinstance(z[0], CM1ARatio)) or (not isinstance(z[1], CM1AAttack))  or (not isinstance(z[2], CM1ARelease)): 
+        if z == None:
+            continue
+        if (
+            (not isinstance(z[0], CM1ARatio))
+            or (not isinstance(z[1], CM1AAttack))
+            or (not isinstance(z[2], CM1ARelease))
+        ):
             return False
-    return True 
+    return True
+
 
 assert len(RAW_SAMPLES_DAY_1) == 19
 assert len(RAW_SAMPLES_DAY_1) == len(RAW_DISTANCES_DAY_1)
@@ -361,7 +375,7 @@ RAW_COMPRESSOR_DAY_2 = annotate(
         (MX20.TWO, MX20.FOUR),
         (MX20.TWO, MX20.FOUR),
         (MX20.EIGHT, MX20.TWELVE),
-        (None, None), #??????
+        (None, None),  # ??????
         "Amanda",
         (MX20.TWO, MX20.FOUR),
         (MX20.EIGHT, MX20.TWELVE),
@@ -415,10 +429,10 @@ RAW_1178_DAY_2 = annotate(
         "Severi",
         None,
         None,
-        (Eleven78.TWELVE, 7,7),
-        (Eleven78.TWELVE, 7,7),
-        (Eleven78.FOUR, 6,6),
-        (Eleven78.FOUR, 6,6),
+        (Eleven78.TWELVE, 7, 7),
+        (Eleven78.TWELVE, 7, 7),
+        (Eleven78.FOUR, 6, 6),
+        (Eleven78.FOUR, 6, 6),
         "Mirjam",
         None,
     ]

@@ -17,7 +17,6 @@ class FiLM(torch.nn.Module):
         self.adaptor = torch.nn.Linear(cond_dim, num_features * 2)
 
     def forward(self, x, cond):
-
         cond = self.adaptor(cond)
         g, b = torch.chunk(cond, 2, dim=-1)
         g = g.permute(0, 2, 1)
