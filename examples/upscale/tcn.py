@@ -194,8 +194,8 @@ class TCNModule(pl.LightningModule):
         cutoff_index = get_cutoff_index(target_stft)
         predicted_stft[:cutoff_index] = target_stft[:cutoff_index]
 
-        predicted_istft = torch.istft(predicted_stft)
-        target_istft = torch.istft(target_stft)
+        predicted_istft = torch.istft(predicted_stft, n_fft=2048).unsqueeze(1)
+        target_istft = torch.istft(target_stft, n_fft=2048).unsqueeze(1)
 
         loss = self.loss_function(predicted_istft, target_istft)
 
