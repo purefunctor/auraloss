@@ -176,28 +176,28 @@ class TCNModule(pl.LightningModule):
             input_signal = center_crop(input_signal, predicted_signal.shape[-1])
             target_signal = center_crop(target_signal, predicted_signal.shape[-1])
 
-        predicted_stft = torch.stft(
-            predicted_signal.squeeze(1),
-            n_fft=2048,
-            window=self.hann_window.to(self.device),
-            pad_mode="constant",
-            return_complex=True,
-        )
-        target_stft = torch.stft(
-            target_signal.squeeze(1),
-            n_fft=2048,
-            window=self.hann_window.to(self.device),
-            pad_mode="constant",
-            return_complex=True,
-        )
+        # predicted_stft = torch.stft(
+        #     predicted_signal.squeeze(1),
+        #     n_fft=2048,
+        #     window=self.hann_window.to(self.device),
+        #     pad_mode="constant",
+        #     return_complex=True,
+        # )
+        # target_stft = torch.stft(
+        #     target_signal.squeeze(1),
+        #     n_fft=2048,
+        #     window=self.hann_window.to(self.device),
+        #     pad_mode="constant",
+        #     return_complex=True,
+        # )
 
-        cutoff_index = get_cutoff_index(target_stft)
-        predicted_stft[:cutoff_index] = target_stft[:cutoff_index]
+        # cutoff_index = get_cutoff_index(target_stft)
+        # predicted_stft[:cutoff_index] = target_stft[:cutoff_index]
 
-        predicted_istft = torch.istft(predicted_stft, n_fft=2048).unsqueeze(1)
-        target_istft = torch.istft(target_stft, n_fft=2048).unsqueeze(1)
+        # predicted_istft = torch.istft(predicted_stft, n_fft=2048).unsqueeze(1)
+        # target_istft = torch.istft(target_stft, n_fft=2048).unsqueeze(1)
 
-        loss = self.loss_function(predicted_istft, target_istft)
+        loss = self.loss_function(predicted_signal, target_signal)
 
         self.log(
             "train_loss",
