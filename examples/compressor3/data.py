@@ -74,7 +74,10 @@ for WHICH_CM1A, GOODS in enumerate(CM1As):
 
 INDEXEDG = [
     list(x)
-    for _, x in groupby(INDEXED, key=lambda item: (item[3], item[4], item[5], item[6]))
+    for _, x in groupby(
+        sorted(INDEXED, key=lambda item: (item[5], item[6])),
+        key=lambda item: (item[3], item[4], item[5], item[6]),
+    )
 ]
 
 
@@ -210,14 +213,13 @@ class CompressorDataModule(pl.LightningDataModule):
         self.half = half
 
     def setup(self, stage: str):
-        print(stage)
         datasets = [
             RecordingDataset(
                 I[0][0],
                 I[0][1],
                 I[0][2],
-                I[0][7] if "67_near" in I[0][7] else I[1][7],
-                I[1][7] if "67_near" in I[0][7] else I[0][7],
+                I[0][-1] if "67_near" in I[0][-1] else I[1][-1],
+                I[1][-1] if "67_near" in I[0][-1] else I[0][-1],
                 chunk_length=self.chunk_length,
                 stride_length=self.stride_length,
                 half=self.half,
