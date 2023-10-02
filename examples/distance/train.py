@@ -13,9 +13,7 @@ parser.add_argument("--nblocks", help="Number of blocks")
 parser.add_argument("--dilation_growth", help="Dilation growth per block")
 parser.add_argument("--kernel_size", help="Kernel size per block")
 parser.add_argument("--channel_width", help="Channel width per block")
-parser.add_argument(
-    "--half", action="store_true", help="Use mixed-precision training", default=True
-)
+parser.add_argument("--half", action="store_true", help="Use mixed-precision training")
 
 configuration = parser.parse_args()
 

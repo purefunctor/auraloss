@@ -1,4 +1,4 @@
-from itertools import product
+from itertools import islice, product, zip_longest
 from tcn import TCNModule
 from torchsummary import summary
 
@@ -39,13 +39,20 @@ for nblocks, dilation_growth, kernel_size, channel_width in product(
 print(f"Total: {len(configurations)}")
 
 
+configurations.sort(key=lambda configuration: configuration["trainable_params"])
+configuration_groups = [
+    list(islice(configurations, i, i + 4)) for i in range(0, len(configurations), 4)
+]
+
 with open("train.sh", "w") as f:
     f.write("#!/usr/bin/bash")
-    f.write("\n\n")
-    for configuration in sorted(configurations, key=lambda configuration: configuration["trainable_params"]):
-        f.write(
-            "python train.py --nblocks={nblocks} --dilation_growth={dilation_growth} --kernel_size={kernel_size} --channel_width={channel_width}  # {trainable_params}".format(
-                **configuration
+    for configuration_group in zip_longest(*configuration_groups):
+        f.write("\n\n")
+        for configuration in configuration_group:
+            if configuration is None:
+                continue
+            f.write(
+                "python train.py --nblocks={nblocks} --dilation_growth={dilation_growth} --kernel_size={kernel_size} --channel_width={channel_width} --half  # {trainable_params}\n".format(
+                    **configuration
+                )
             )
-        )
-        f.write("\n")
