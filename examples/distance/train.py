@@ -29,7 +29,7 @@ model = TCNModule(
     dilation_growth=dilation_growth,
     kernel_size=kernel_size,
     channel_width=channel_width,
-    lr=0.0001,
+    lr=0.001,
 )
 
 datamodule = DistanceAugmentDataModule(
