@@ -40,7 +40,7 @@ print(f"Total: {len(configurations)}")
 
 
 with open("train.sh", "w") as f:
-    f.write("#!/usr/bin/sh")
+    f.write("#!/usr/bin/bash")
     f.write("\n\n")
     for configuration in sorted(configurations, key=lambda configuration: configuration["trainable_params"]):
         f.write(
