@@ -3,6 +3,7 @@ from data import DAY_1_FOLDER, DAY_2_FOLDER, DistanceAugmentDataModule
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.trainer import Trainer
+from pytorch_lightning.utilities import rank_zero_only
 from tcn import TCNModule
 import torch
 
@@ -47,13 +48,15 @@ wandb_logger = WandbLogger(
     name=f"TCN-{nblocks}n-{dilation_growth}g-{kernel_size}k-{channel_width}w",
     log_model="all",
 )
-wandb_logger.experiment.config.update(
-    {
-        "receptive_field": model.compute_receptive_field(),
-        "batch_size": datamodule.batch_size,
-        "chunk_size": datamodule.chunk_size,
-    }
-)
+
+if rank_zero_only.rank == 0:
+    wandb_logger.experiment.config.update(
+        {
+            "receptive_field": model.compute_receptive_field(),
+            "batch_size": datamodule.batch_size,
+            "chunk_size": datamodule.chunk_size,
+        }
+    )
 
 model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
 trainer = Trainer(
