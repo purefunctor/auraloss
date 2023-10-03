@@ -172,7 +172,7 @@ class TCNModule(pl.LightningModule):
             on_step=True,
             on_epoch=True,
             prog_bar=True,
-            logger=True,
+            # logger=True,
             sync_dist=True,
         )
 
