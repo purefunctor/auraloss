@@ -1,3 +1,6 @@
+from collections import defaultdict
+from data import FILE_PATTERN
+from pathlib import Path
 import soundfile as sf
 from tcn import TCNModule
 import torch
@@ -6,54 +9,72 @@ import wandb
 
 api = wandb.Api()
 
-artifact = api.artifact("meeshkan/near-to-far/model-qj6nboda:v19")
+artifact = api.artifact("meeshkan/near-to-far/model-2embekr3:v18")
 weights = artifact.get_path("model.ckpt").download("/tmp")
-model = TCNModule.load_from_checkpoint(weights, map_location=torch.device("cpu")).eval()
+model = TCNModule.load_from_checkpoint(weights).eval()
 receptive_field = model.compute_receptive_field()
 
-with sf.SoundFile("data/day1_unsilenced/414_near_far_close_30_1192.wav", "r") as f:
-    f.seek(88 * 44100 - receptive_field)
-    input_audio = f.read(44100 * 10 + receptive_field, dtype="float32", always_2d=True)
-    input_audio = torch.tensor(input_audio.T).unsqueeze(0)
 
-with sf.SoundFile("data/day1_unsilenced/414_far_far_far_65_1192.wav", "r") as f:
-    f.seek(88 * 44100 - receptive_field)
-    target_audio = f.read(44100 * 10 + receptive_field, dtype="float32", always_2d=True)
-    target_audio = torch.tensor(target_audio.T).unsqueeze(0)
+files_per_name_offset = {
+    "day1": defaultdict(list),
+    "day2": defaultdict(list),
+}
 
-y = model(input_audio).squeeze().detach().numpy()
+_data = Path("data")
+for day in ["day1", "day2"]:
+    path = _data / f"{day}_unsilenced"
+    for file in path.iterdir():
+        match = FILE_PATTERN.match(file.name)
+        if match is None:
+            continue
+        (name, near_or_far, offset) = match.groups()
+        files_per_name_offset[day][(name, near_or_far, offset)] = file
 
-sf.write("414_near.wav", input_audio.squeeze().numpy()[receptive_field:], samplerate=44100)
-sf.write("414_far.wav", target_audio.squeeze().numpy()[receptive_field:], samplerate=44100)
-sf.write("414_pred.wav", y, samplerate=44100)
+offset_start_pairs = {
+    "day1": [
+        ("1192", 88),
+        ("7885", 30),
+        ("13140", 15),
+        ("4273", 15),
+    ],
+    "day2": [
+        ("2146", 19),
+        ("19066", 10),
+        ("19919", 21),
+        ("22727", 6),
+    ],
+}
 
+input_microphones = [
+    ("414", "near", "far"),
+]
 
-# artifacts = [
-#     ("TCN-100", "meeshkan/near-to-far/model-o4p6cz29:v19"),
-#     ("TCN-300", "meeshkan/near-to-far/model-824yyzni:v19"),
-# ]
+_results = Path("results")
+if not _results.exists():
+    _results.mkdir()
 
-# for model_name, artifact_name in artifacts:
-#     artifact = api.artifact(artifact_name)
-#     weights = artifact.get_path("model.ckpt").download(f"/tmp/{model_name}")
-#     model = TCNModule.load_from_checkpoint(
-#         weights, map_location=torch.device("cpu")
-#     ).eval()
-#     receptive_field = model.compute_receptive_field()
+for day in ["day1", "day2"]:
+    for (name, near, far) in input_microphones:
+        for offset, start in offset_start_pairs[day]:
+            input_file = files_per_name_offset[day][(name, near, offset)]
+            target_file = files_per_name_offset[day][(name, far, offset)]
 
-#     with sf.SoundFile("data/day1_unsilenced/414_near_far_close_30_1192.wav", "r") as f:
-#         f.seek(88 * 44100 - receptive_field)
-#         input_audio = f.read(44100 * 10 + receptive_field, dtype="float32")
+            with sf.SoundFile(input_file, "r") as f:
+                f.seek(start * 44100 - receptive_field)
+                input_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
+                sf.write(f"results/{day}_{name}_{offset}_input.wav", input_audio[receptive_field:], samplerate=44100)
+                input_audio = torch.tensor(input_audio.T).unsqueeze(0).cuda()
+            
+            with sf.SoundFile(target_file, "r") as f:
+                f.seek(start * 44100 - receptive_field)
+                target_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
+                sf.write(f"results/{day}_{name}_{offset}_target.wav", target_audio[receptive_field:], samplerate=44100)
 
-#     with sf.SoundFile("data/day1_unsilenced/414_far_far_far_65_1192.wav", "r") as f:
-#         f.seek(88 * 44100)
-#         target_audio = f.read(44100 * 10, dtype="float32")
+            prediction_audio = model(input_audio).squeeze().detach().cpu().numpy()
+            sf.write(f"results/{day}_{name}_{offset}_prediction.wav", prediction_audio, samplerate=44100)
 
-#     i = torch.tensor(input_audio).unsqueeze(0).unsqueeze(0)
-#     y = model(i).squeeze().float().detach().numpy()
+            del input_audio
+            del target_audio
+            del prediction_audio
 
-#     sf.write(
-#         f"414_near_{model_name}.wav", input_audio[receptive_field:], samplerate=44100
-#     )
-#     sf.write(f"414_far_{model_name}.wav", target_audio, samplerate=44100)
-#     sf.write(f"414_pred_{model_name}.wav", y, samplerate=44100)
+            torch.cuda.empty_cache()
