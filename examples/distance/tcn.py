@@ -98,7 +98,7 @@ class TCNModule(pl.LightningModule):
         lr=0.0001,
     ):
         super().__init__()
-        self.save_hyperparameters()
+        # self.save_hyperparameters()
 
         self.loss_function = LossFunction()
 
