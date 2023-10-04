@@ -77,7 +77,7 @@ if __name__ == "__main__":
             "nblocks": {"min": 4, "max": 10},
             "dilation_growth": {"min": 2, "max": 10},
             "kernel_size": {"min": 5, "max": 25},
-            "channel_width": {"min": 32, "max": 192},
+            "channel_width": {"values": [32, 48, 64, 70, 96]},
             "stack_size": {"min": 2, "max": 10},
             "batch_size": {"values": [16, 32, 64]},
         },
