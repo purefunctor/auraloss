@@ -11,6 +11,7 @@ torch.set_float32_matmul_precision("high")
 
 
 def train_model():
+    wandb.init()
     config = wandb.config
 
     nblocks = config.nblocks
@@ -30,6 +31,10 @@ def train_model():
     )
     info = summary(model, verbose=0)
     parameter_count = info.total_params
+
+    if model.compute_receptive_field() > 32768:
+        print(f"Too large: {nblocks}n-{dilation_growth}g-{kernel_size}k-{channel_width}w-{stack_size}s-{parameter_count}p")
+        return
 
     datamodule = DistanceAugmentDataModule(
         DAY_1_FOLDER,
