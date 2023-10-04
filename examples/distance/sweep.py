@@ -11,7 +11,6 @@ torch.set_float32_matmul_precision("high")
 
 
 def train_model():
-    wandb.init(project="near-to-far")
     config = wandb.config
 
     nblocks = config.nblocks
