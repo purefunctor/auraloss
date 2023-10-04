@@ -7,14 +7,6 @@ import torch
 import wandb
 
 
-api = wandb.Api()
-
-artifact = api.artifact("meeshkan/near-to-far/model-2embekr3:v18")
-weights = artifact.get_path("model.ckpt").download("/tmp")
-model = TCNModule.load_from_checkpoint(weights).eval()
-receptive_field = model.compute_receptive_field()
-
-
 files_per_name_offset = {
     "day1": defaultdict(list),
     "day2": defaultdict(list),
@@ -38,10 +30,10 @@ offset_start_pairs = {
         ("4273", 15),
     ],
     "day2": [
-        ("2146", 19),
-        ("19066", 10),
-        ("19919", 21),
-        ("22727", 6),
+        # ("2146", 19),
+        # ("19066", 10),
+        # ("19919", 21),
+        # ("22727", 6),
     ],
 }
 
@@ -53,28 +45,38 @@ _results = Path("results")
 if not _results.exists():
     _results.mkdir()
 
-for day in ["day1", "day2"]:
-    for (name, near, far) in input_microphones:
-        for offset, start in offset_start_pairs[day]:
-            input_file = files_per_name_offset[day][(name, near, offset)]
-            target_file = files_per_name_offset[day][(name, far, offset)]
+api = wandb.Api()
 
-            with sf.SoundFile(input_file, "r") as f:
-                f.seek(start * 44100 - receptive_field)
-                input_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
-                sf.write(f"results/{day}_{name}_{offset}_input.wav", input_audio[receptive_field:], samplerate=44100)
-                input_audio = torch.tensor(input_audio.T).unsqueeze(0).cuda()
-            
-            with sf.SoundFile(target_file, "r") as f:
-                f.seek(start * 44100 - receptive_field)
-                target_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
-                sf.write(f"results/{day}_{name}_{offset}_target.wav", target_audio[receptive_field:], samplerate=44100)
+for run in api.runs(path="meeshkan/near-to-far"):
+    if len(run.tags) > 0 or run.state != "finished":
+        continue
+    artifact = api.artifact(f"meeshkan/near-to-far/model-{run.id}:latest")
+    weights = artifact.get_path("model.ckpt").download("/tmp")
+    model = TCNModule.load_from_checkpoint(
+        weights, map_location=torch.device("cpu")
+    ).eval()
+    receptive_field = model.compute_receptive_field()
 
-            prediction_audio = model(input_audio).squeeze().detach().cpu().numpy()
-            sf.write(f"results/{day}_{name}_{offset}_prediction.wav", prediction_audio, samplerate=44100)
+    for day in ["day1", "day2"]:
+        for (name, near, far) in input_microphones:
+            for offset, start in offset_start_pairs[day]:
+                input_file = files_per_name_offset[day][(name, near, offset)]
+                target_file = files_per_name_offset[day][(name, far, offset)]
 
-            del input_audio
-            del target_audio
-            del prediction_audio
+                with sf.SoundFile(input_file, "r") as f:
+                    f.seek(start * 44100 - receptive_field)
+                    input_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
+                    sf.write(f"results/{day}_{name}_{offset}_input.wav", input_audio[receptive_field:], samplerate=44100)
+                    input_audio = torch.tensor(input_audio.T).unsqueeze(0)
+                
+                with sf.SoundFile(target_file, "r") as f:
+                    f.seek(start * 44100 - receptive_field)
+                    target_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
+                    sf.write(f"results/{day}_{name}_{offset}_target.wav", target_audio[receptive_field:], samplerate=44100)
 
-            torch.cuda.empty_cache()
+                prediction_audio = model(input_audio).squeeze().detach().numpy()
+                sf.write(f"results/{run.name}_{day}_{name}_{offset}_prediction.wav", prediction_audio, samplerate=44100)
+
+                del input_audio
+                del target_audio
+                del prediction_audio
