@@ -52,6 +52,8 @@ def train_model():
         log_model="all",
     )
 
+    wandb_logger.watch(model)
+
     model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
     trainer = Trainer(
         max_epochs=5,
