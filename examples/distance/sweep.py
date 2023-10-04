@@ -74,12 +74,12 @@ if __name__ == "__main__":
             "name": "val_loss/MRSTFT",
         },
         "parameters": {
-            "nblocks": {"min": 4, "max": 10},
-            "dilation_growth": {"min": 2, "max": 10},
-            "kernel_size": {"min": 5, "max": 25},
+            "nblocks": {"min": 1, "max": 4},
+            "dilation_growth": {"min": 2, "max": 20},
+            "kernel_size": {"min": 3, "max": 10},
             "channel_width": {"values": [32, 48, 64, 70, 96]},
-            "stack_size": {"min": 2, "max": 10},
-            "batch_size": {"values": [16, 32, 64]},
+            "stack_size": {"min": 1, "max": 4},
+            "batch_size": {"values": [32, 64, 96]},
         },
     }
 
