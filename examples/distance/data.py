@@ -186,7 +186,7 @@ class DistanceAugmentDataModule(pl.LightningDataModule):
         training_dataset = [
             DistanceAugmentDataset(
                 files,
-                {"67": "269", "87": "87", "103": "103"},
+                {"67": "269"},
                 near_is_input=self.near_is_input,
                 chunk_size=self.chunk_size,
                 stride_factor=self.stride_factor,

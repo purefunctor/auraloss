@@ -30,7 +30,7 @@ model = TCNModule(
     dilation_growth=dilation_growth,
     kernel_size=kernel_size,
     channel_width=channel_width,
-    lr=0.001,
+    lr=0.002,
 )
 
 datamodule = DistanceAugmentDataModule(
@@ -39,7 +39,7 @@ datamodule = DistanceAugmentDataModule(
     chunk_size=32768,
     num_workers=16,
     half=half,
-    batch_size=128,
+    batch_size=32,
     near_is_input=True,
 )
 
@@ -60,7 +60,7 @@ if rank_zero_only.rank == 0:
 
 model_checkpoint = ModelCheckpoint(save_top_k=-1, every_n_epochs=1)
 trainer = Trainer(
-    max_epochs=20,
+    max_epochs=10,
     callbacks=[model_checkpoint],
     precision=precision,
     logger=wandb_logger,

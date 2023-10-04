@@ -81,7 +81,7 @@ class LossFunction(torch.nn.Module):
         self.mr_stft = auraloss.freq.MultiResolutionSTFTLoss()
 
     def forward(self, input, target):
-        return self.log_cosh(input, target) * 0.25 + self.mr_stft(input, target) * 0.75
+        return self.log_cosh(input, target) + self.mr_stft(input, target)
 
 
 class TCNModule(pl.LightningModule):
