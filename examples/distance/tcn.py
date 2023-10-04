@@ -98,6 +98,15 @@ class TCNModule(pl.LightningModule):
         lr=0.0001,
     ):
         super().__init__()
+
+        self.nblocks = nblocks
+        self.kernel_size = kernel_size
+        self.dilation_growth = dilation_growth
+        self.channel_width = channel_width
+        self.stack_size = stack_size
+        self.causal = causal
+        self.lr = lr
+
         # self.save_hyperparameters()
 
         self.loss_function = LossFunction()
@@ -134,7 +143,7 @@ class TCNModule(pl.LightningModule):
             if index == 0:
                 skips = x
             else:
-                if self.hparams.causal:
+                if self.causal:
                     skips = causal_crop(skips, x.shape[-1]) + x
                 else:
                     skips = center_crop(skips, x.shape[-1]) + x
@@ -144,11 +153,11 @@ class TCNModule(pl.LightningModule):
 
     def compute_receptive_field(self):
         """Compute the receptive field in samples."""
-        receptive_field = self.hparams.kernel_size
-        for index in range(1, self.hparams.nblocks):
-            dilation = self.hparams.dilation_growth ** (index % self.hparams.stack_size)
+        receptive_field = self.kernel_size
+        for index in range(1, self.nblocks):
+            dilation = self.dilation_growth ** (index % self.stack_size)
             receptive_field = receptive_field + (
-                (self.hparams.kernel_size - 1) * dilation
+                (self.kernel_size - 1) * dilation
             )
         return receptive_field
 
@@ -157,7 +166,7 @@ class TCNModule(pl.LightningModule):
 
         predicted_signal = self(input_signal)
 
-        if self.hparams.causal:
+        if self.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
             target_signal = causal_crop(target_signal, predicted_signal.shape[-1])
         else:
@@ -182,7 +191,7 @@ class TCNModule(pl.LightningModule):
         input_signal, target_signal = batch
         predicted_signal = self(input_signal)
 
-        if self.hparams.causal:
+        if self.causal:
             input_signal = causal_crop(input_signal, predicted_signal.shape[-1])
             target_signal = causal_crop(target_signal, predicted_signal.shape[-1])
         else:
@@ -217,7 +226,7 @@ class TCNModule(pl.LightningModule):
         self.log("val_loss/MRSTFT", mrstft_loss, sync_dist=True)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), self.hparams.lr)
+        optimizer = torch.optim.Adam(self.parameters(), self.lr)
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, patience=4, verbose=True
         )
