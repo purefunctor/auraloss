@@ -75,13 +75,13 @@ if __name__ == "__main__":
         },
         "parameters": {
             "nblocks": {"min": 1, "max": 4},
-            "dilation_growth": {"min": 2, "max": 20},
-            "kernel_size": {"min": 3, "max": 10},
-            "channel_width": {"values": [32, 48, 64, 70, 96]},
+            "dilation_growth": {"min": 15, "max": 20},
+            "kernel_size": {"min": 2, "max": 5},
+            "channel_width": {"values": [32, 48]},
             "stack_size": {"min": 1, "max": 4},
             "batch_size": {"values": [32, 64, 96]},
         },
     }
 
     sweep_id = wandb.sweep(sweep_config, project="near-to-far")
-    wandb.agent(sweep_id=sweep_id, function=train_model, count=10)
+    wandb.agent(sweep_id=sweep_id, function=train_model, count=3)
