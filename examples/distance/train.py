@@ -24,6 +24,7 @@ nblocks = int(configuration.nblocks)
 dilation_growth = int(configuration.dilation_growth)
 kernel_size = int(configuration.kernel_size)
 channel_width = int(configuration.channel_width)
+stack_size = int(configuration.stack_size)
 half = configuration.half
 far = configuration.far
 precision = "16-mixed" if half else "32-true"
@@ -34,6 +35,7 @@ model = TCNModule(
     dilation_growth=dilation_growth,
     kernel_size=kernel_size,
     channel_width=channel_width,
+    stack_size=stack_size,
     lr=0.002,
 )
 
@@ -44,12 +46,12 @@ datamodule = DistanceAugmentDataModule(
     num_workers=16,
     half=half,
     batch_size=64,
-    near_is_input=True,
+    near_is_input=not far,
 )
 
 wandb_logger = WandbLogger(
     project=project,
-    name=f"TCN-{nblocks}n-{dilation_growth}g-{kernel_size}k-{channel_width}w",
+    name=f"TCN-{nblocks}n-{dilation_growth}g-{kernel_size}k-{channel_width}w-{stack_size}s",
     log_model="all",
 )
 
