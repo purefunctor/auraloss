@@ -11,10 +11,12 @@ torch.set_float32_matmul_precision("high")
 
 parser = ArgumentParser("training-script")
 parser.add_argument("--nblocks", help="Number of blocks")
-parser.add_argument("--dilation_growth", help="Dilation growth per block")
-parser.add_argument("--kernel_size", help="Kernel size per block")
-parser.add_argument("--channel_width", help="Channel width per block")
+parser.add_argument("--dilation-growth", help="Dilation growth per block")
+parser.add_argument("--kernel-size", help="Kernel size per block")
+parser.add_argument("--channel-width", help="Channel width per block")
+parser.add_argument("--stack-size", help="Number of blocks before dilation resets")
 parser.add_argument("--half", action="store_true", help="Use mixed-precision training")
+parser.add_argument("--far", action="store_true", help="Train with far-to-near")
 
 configuration = parser.parse_args()
 
@@ -23,14 +25,16 @@ dilation_growth = int(configuration.dilation_growth)
 kernel_size = int(configuration.kernel_size)
 channel_width = int(configuration.channel_width)
 half = configuration.half
+far = configuration.far
 precision = "16-mixed" if half else "32-true"
+project = "near-to-far" if not far else "far-to-near"
 
 model = TCNModule(
     nblocks=nblocks,
     dilation_growth=dilation_growth,
     kernel_size=kernel_size,
     channel_width=channel_width,
-    lr=0.001,
+    lr=0.002,
 )
 
 datamodule = DistanceAugmentDataModule(
@@ -39,12 +43,12 @@ datamodule = DistanceAugmentDataModule(
     chunk_size=32768,
     num_workers=16,
     half=half,
-    batch_size=128,
+    batch_size=64,
     near_is_input=True,
 )
 
 wandb_logger = WandbLogger(
-    project="near-to-far",
+    project=project,
     name=f"TCN-{nblocks}n-{dilation_growth}g-{kernel_size}k-{channel_width}w",
     log_model="all",
 )
