@@ -42,7 +42,7 @@ class InputTargetDataset(Dataset):
             )
             input_audio = torch.tensor(input_audio.T)
 
-        with sf.SoundFile(self.input_file, "r") as f:
+        with sf.SoundFile(self.target_file, "r") as f:
             f.seek(frame_index)
             target_audio = f.read(
                 frames=self.chunk_size,
