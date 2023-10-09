@@ -85,16 +85,6 @@ class TCNBlock(torch.nn.Module):
         return x
 
 
-class LossFunction(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.log_cosh = auraloss.time.LogCoshLoss()
-        self.mr_stft = auraloss.freq.MultiResolutionSTFTLoss()
-
-    def forward(self, input, target):
-        return self.log_cosh(input, target) * 0.25 + self.mr_stft(input, target) * 0.75
-
-
 class TCNModule(pl.LightningModule):
     """Temporeal convolutional network with conditioning module."""
 
@@ -111,8 +101,8 @@ class TCNModule(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.hann_window = torch.hann_window(2048)
-        self.loss_function = LossFunction()
+        # self.hann_window = torch.hann_window(2048)
+        self.loss_function = auraloss.freq.MultiResolutionSTFTLoss()
 
         self.l1 = torch.nn.L1Loss()
         self.esr = auraloss.time.ESRLoss()

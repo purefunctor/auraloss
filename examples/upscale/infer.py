@@ -63,17 +63,33 @@ for day in ["day1", "day2"]:
 
             with sf.SoundFile(input_file, "r") as f:
                 f.seek(start * 44100 - receptive_field)
-                input_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
-                sf.write(f"results/{day}_{name}_{offset}_input.wav", input_audio[receptive_field:], samplerate=44100)
+                input_audio = f.read(
+                    44100 * 15 + receptive_field, dtype="float32", always_2d=True
+                )
+                sf.write(
+                    f"results/{day}_{name}_{offset}_input.wav",
+                    input_audio[receptive_field:],
+                    samplerate=44100,
+                )
                 input_audio = torch.tensor(input_audio.T).unsqueeze(0).cuda()
-            
+
             with sf.SoundFile(target_file, "r") as f:
                 f.seek(start * 44100 - receptive_field)
-                target_audio = f.read(44100 * 15 + receptive_field, dtype="float32", always_2d=True)
-                sf.write(f"results/{day}_{name}_{offset}_target.wav", target_audio[receptive_field:], samplerate=44100)
+                target_audio = f.read(
+                    44100 * 15 + receptive_field, dtype="float32", always_2d=True
+                )
+                sf.write(
+                    f"results/{day}_{name}_{offset}_target.wav",
+                    target_audio[receptive_field:],
+                    samplerate=44100,
+                )
 
             prediction_audio = model(input_audio).squeeze().detach().cpu().numpy()
-            sf.write(f"results/{day}_{name}_{offset}_prediction.wav", prediction_audio, samplerate=44100)
+            sf.write(
+                f"results/{day}_{name}_{offset}_prediction.wav",
+                prediction_audio,
+                samplerate=44100,
+            )
 
             del input_audio
             del target_audio
