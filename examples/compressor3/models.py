@@ -151,15 +151,14 @@ class System(pl.LightningModule):
         return y_h, p_h
 
     def training_step(self, batch, batch_idx):
-        input_signal, target_signal, input_parameters = batch
+        input_signal, target_signal, _ = batch
 
-        predicted_signal, target_parameters = self(input_signal, target_signal)
+        predicted_signal, _ = self(input_signal, target_signal)
 
         target_signal = center_crop(target_signal, predicted_signal.shape)
         predicted_signal = center_crop(predicted_signal, predicted_signal.shape)
 
         s_loss = self.mrstft(predicted_signal, target_signal)
-        p_loss = self.mse(target_parameters, input_parameters)
 
         self.log(
             "train_loss",
@@ -169,16 +168,8 @@ class System(pl.LightningModule):
             prog_bar=True,
             logger=True,
         )
-        self.log(
-            "train_loss/parameters",
-            p_loss,
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-        )
 
-        return s_loss + p_loss
+        return s_loss
 
     def validation_step(self, batch, batch_idx):
         input_signal, target_signal, _ = batch
