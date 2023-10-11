@@ -113,6 +113,7 @@ class System(pl.LightningModule):
         lr=0.001,
     ):
         super().__init__()
+        self.save_hyperparameters()
 
         self.embedding_dimensions = embedding_dimensions
         self.width_multiplier = width_multiplier
@@ -151,7 +152,7 @@ class System(pl.LightningModule):
         return y_h, p_h
 
     def training_step(self, batch, batch_idx):
-        input_signal, target_signal, _ = batch
+        input_signal, target_signal = batch
 
         predicted_signal, _ = self(input_signal, target_signal)
 
@@ -172,7 +173,7 @@ class System(pl.LightningModule):
         return s_loss
 
     def validation_step(self, batch, batch_idx):
-        input_signal, target_signal, _ = batch
+        input_signal, target_signal = batch
 
         predicted_signal, _ = self(input_signal, target_signal)
 
@@ -221,13 +222,15 @@ class System(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    from data import CompressorDataModule
+    from data import DAY_1_FOLDER, DAY_2_FOLDER, EnhancementDataModule
 
     torch.set_float32_matmul_precision("high")
 
-    datamodule = CompressorDataModule(
-        chunk_length=32768 * 2,
-        stride_length=32768 * 2,
+    datamodule = EnhancementDataModule(
+        DAY_1_FOLDER,
+        DAY_2_FOLDER,
+        chunk_size=32768 * 2,
+        stride_factor=1,
         batch_size=16,
         num_workers=16,
         shuffle=True,
