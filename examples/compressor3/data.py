@@ -1,5 +1,5 @@
 import torchaudio
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import soundfile as sf
 import torch
 from torch.utils.data import ConcatDataset, Dataset, DataLoader
@@ -17,7 +17,6 @@ from control_data_experiment_1 import (
     RAW_CM1A2_DAY_2,
 )
 import subprocess
-import os
 
 CM1As = [
     [RAW_CM1A1_DAY_1, RAW_CM1A1_DAY_2, ["67_near.wav", "67_CM1A_1.wav"]],
@@ -247,3 +246,9 @@ class CompressorDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
         )
+
+
+if __name__ == '__main__':
+    import subprocess
+    for FI in INDEXED:
+        subprocess.call(f'aws s3 cp s3://meeshkan-datasets/compressor-cm1a/{FI[-1]} {FI[-1]}', shell=True)
